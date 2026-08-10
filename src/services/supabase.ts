@@ -5,17 +5,25 @@ const DEFAULT_SUPABASE_URL = "https://mzpmvmuthgnrlcrqpvru.supabase.co";
 const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cG12bXV0aGducmxjcnFwdnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MTExOTcsImV4cCI6MjEwMTA4NzE5N30.zHErOtDt_zECvOct7ZwX4934BCI23ZuKRaHfdmj9fzg";
 
 export function getAppConfig(): AppConfig {
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
   const saved = localStorage.getItem('metalrib_config');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      return {
+        ...parsed,
+        supabaseUrl: parsed.supabaseUrl || envUrl || DEFAULT_SUPABASE_URL,
+        supabaseKey: parsed.supabaseKey || envKey || DEFAULT_SUPABASE_KEY
+      };
     } catch {
       // fallback
     }
   }
   return {
-    supabaseUrl: DEFAULT_SUPABASE_URL,
-    supabaseKey: DEFAULT_SUPABASE_KEY,
+    supabaseUrl: envUrl || DEFAULT_SUPABASE_URL,
+    supabaseKey: envKey || DEFAULT_SUPABASE_KEY,
     operadorPadrao: 'Operador PCP',
     autoImprimirAoSalvar: false,
     manterMedidaBumpers: true,
