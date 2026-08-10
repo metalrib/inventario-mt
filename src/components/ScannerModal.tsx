@@ -38,28 +38,29 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     }
   };
 
-  // Fetch cameras list on mount or when modal opens
+  // Fetch cameras list when camera becomes active
+  const updateCameraList = async () => {
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        setCameras(devices);
+        const backCamIndex = devices.findIndex(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('traseira') ||
+          d.label.toLowerCase().includes('rear') ||
+          d.label.toLowerCase().includes('environment')
+        );
+        if (backCamIndex >= 0) {
+          setSelectedCameraIndex(backCamIndex);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not list cameras:", err);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-          // Prefer back/environment cameras
-          const backCamIndex = devices.findIndex(d => 
-            d.label.toLowerCase().includes('back') || 
-            d.label.toLowerCase().includes('traseira') ||
-            d.label.toLowerCase().includes('rear') ||
-            d.label.toLowerCase().includes('environment')
-          );
-          if (backCamIndex >= 0) {
-            setSelectedCameraIndex(backCamIndex);
-          }
-        }
-      }).catch(err => {
-        console.warn("Could not get camera list:", err);
-      });
-
-      // Auto start camera on open for seamless experience
       startCamera();
     } else {
       stopCamera();
@@ -68,35 +69,30 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
   const startCamera = async (overrideCameraId?: string) => {
     setScanError(null);
+    setIsCameraActive(true);
+
+    // Give DOM a tick to render #interactive-scanner
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
       if (scannerRef.current) {
         if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
+          try {
+            await scannerRef.current.stop();
+          } catch (e) {
+            // Ignore stop error
+          }
         }
       } else {
         scannerRef.current = new Html5Qrcode("interactive-scanner");
       }
 
-      setIsCameraActive(true);
-
-      const targetCamera = overrideCameraId || (cameras[selectedCameraIndex]?.id);
-
-      const cameraConfig = targetCamera 
-        ? targetCamera 
-        : {
-            facingMode: { ideal: "environment" },
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 }
-          };
-
       const scanConfig = {
-        fps: 20,
+        fps: 15,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          return {
-            width: Math.max(260, Math.floor(minEdge * 0.88)),
-            height: Math.max(260, Math.floor(minEdge * 0.88))
-          };
+          const minEdge = Math.min(viewfinderWidth || 300, viewfinderHeight || 300);
+          const boxSize = Math.max(200, Math.floor(minEdge * 0.8));
+          return { width: boxSize, height: boxSize };
         },
         aspectRatio: 1.0,
         experimentalFeatures: {
@@ -112,23 +108,51 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         ]
       };
 
-      await scannerRef.current.start(
-        cameraConfig as any,
-        scanConfig,
-        (decodedText) => {
-          playBeep();
-          onScanResult(decodedText);
-          stopCamera();
-          onClose();
-        },
-        () => {
-          // Continuous frame scan error
-        }
-      );
+      const targetCam = overrideCameraId || (cameras.length > 0 ? cameras[selectedCameraIndex]?.id : undefined);
+
+      // Attempt 1: Standard environment or specified target camera
+      let cameraConfig: any = targetCam ? { deviceId: { exact: targetCam } } : { facingMode: "environment" };
+
+      try {
+        await scannerRef.current.start(
+          cameraConfig,
+          scanConfig,
+          (decodedText) => {
+            playBeep();
+            onScanResult(decodedText);
+            stopCamera();
+            onClose();
+          },
+          () => {}
+        );
+      } catch (firstErr) {
+        console.warn("First camera start failed, trying fallback facingMode 'user' or default:", firstErr);
+        // Attempt 2 Fallback: simple facingMode string or fallback
+        await scannerRef.current.start(
+          { facingMode: "user" },
+          scanConfig,
+          (decodedText) => {
+            playBeep();
+            onScanResult(decodedText);
+            stopCamera();
+            onClose();
+          },
+          () => {}
+        );
+      }
+
+      // Update camera list after permission granted
+      updateCameraList();
+
     } catch (e: any) {
       console.error("Camera start error:", e);
       setIsCameraActive(false);
-      setScanError("Não foi possível focar na câmera. Verifique as permissões de vídeo do seu navegador.");
+      const msg = e?.message || e?.toString() || '';
+      if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+        setScanError("Acesso à câmera negado. Por favor, permita o acesso à câmera nas configurações do seu navegador.");
+      } else {
+        setScanError("Não foi possível conectar à câmera do dispositivo. Tente usar o leitor manual abaixo.");
+      }
     }
   };
 
@@ -199,13 +223,13 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
               }
             `}</style>
 
-            <div id="interactive-scanner" className={`w-full min-h-[260px] ${isCameraActive ? 'block' : 'hidden'}`} />
+            <div id="interactive-scanner" className="w-full min-h-[260px] relative z-0 bg-slate-900" />
 
             {isCameraActive && cameras.length > 1 && (
               <button
                 type="button"
                 onClick={handleSwitchCamera}
-                className="absolute top-3 right-3 bg-slate-900/80 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg backdrop-blur-sm z-10 cursor-pointer"
+                className="absolute top-3 right-3 bg-slate-900/80 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg backdrop-blur-sm z-20 cursor-pointer"
               >
                 <RefreshCw size={14} className="animate-spin-slow" />
                 <span>Trocar Câmera</span>
@@ -213,13 +237,13 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             )}
 
             {!isCameraActive && (
-              <div className="text-center p-6 text-slate-400 my-auto">
+              <div className="absolute inset-0 z-10 bg-slate-900 text-center p-6 text-slate-400 flex flex-col items-center justify-center">
                 <Camera size={40} className="mx-auto mb-2 text-slate-500" />
                 <p className="text-xs font-semibold mb-3 text-slate-300">
                   Aponta a câmera do celular diretamente para o QR Code ou Código de Barras
                 </p>
                 {scanError && (
-                  <p className="text-xs text-rose-400 bg-rose-950/60 p-2 rounded-lg mb-3">
+                  <p className="text-xs text-rose-400 bg-rose-950/60 p-2 rounded-lg mb-3 max-w-xs">
                     {scanError}
                   </p>
                 )}
