@@ -1,0 +1,6 @@
+{
+  "name": "Sistema Inventario",
+  "description": "Sistema de Coleta PCP para Controle de Estoque, Perfis, Retalhos e Bumpers com Impressão de Etiquetas, Sincronização Supabase e Relatórios",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
