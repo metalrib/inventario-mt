@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, Barcode, Check, Volume2 } from 'lucide-react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { X, Camera, Barcode, Check, RefreshCw, Zap } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats, CameraDevice } from 'html5-qrcode';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -16,6 +16,8 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   const playBeep = () => {
@@ -36,33 +38,83 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     }
   };
 
+  // Fetch cameras list on mount or when modal opens
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          // Prefer back/environment cameras
+          const backCamIndex = devices.findIndex(d => 
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('traseira') ||
+            d.label.toLowerCase().includes('rear') ||
+            d.label.toLowerCase().includes('environment')
+          );
+          if (backCamIndex >= 0) {
+            setSelectedCameraIndex(backCamIndex);
+          }
+        }
+      }).catch(err => {
+        console.warn("Could not get camera list:", err);
+      });
+
+      // Auto start camera on open for seamless experience
+      startCamera();
+    } else {
       stopCamera();
     }
   }, [isOpen]);
 
-  const startCamera = async () => {
+  const startCamera = async (overrideCameraId?: string) => {
     setScanError(null);
     try {
-      if (!scannerRef.current) {
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+      } else {
         scannerRef.current = new Html5Qrcode("interactive-scanner");
       }
 
       setIsCameraActive(true);
 
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        {
-          fps: 15,
-          qrbox: { width: 240, height: 240 },
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.QR_CODE
-          ]
+      const targetCamera = overrideCameraId || (cameras[selectedCameraIndex]?.id);
+
+      const cameraConfig = targetCamera 
+        ? targetCamera 
+        : {
+            facingMode: { ideal: "environment" },
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 }
+          };
+
+      const scanConfig = {
+        fps: 20,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          return {
+            width: Math.max(260, Math.floor(minEdge * 0.88)),
+            height: Math.max(260, Math.floor(minEdge * 0.88))
+          };
         },
+        aspectRatio: 1.0,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.DATA_MATRIX
+        ]
+      };
+
+      await scannerRef.current.start(
+        cameraConfig as any,
+        scanConfig,
         (decodedText) => {
           playBeep();
           onScanResult(decodedText);
@@ -70,14 +122,22 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           onClose();
         },
         () => {
-          // Continuous frame scan error, ignore
+          // Continuous frame scan error
         }
       );
     } catch (e: any) {
       console.error("Camera start error:", e);
       setIsCameraActive(false);
-      setScanError("Não foi possível acessar a câmera. Verifique as permissões no seu navegador.");
+      setScanError("Não foi possível focar na câmera. Verifique as permissões de vídeo do seu navegador.");
     }
+  };
+
+  const handleSwitchCamera = async () => {
+    if (cameras.length < 2) return;
+    const nextIndex = (selectedCameraIndex + 1) % cameras.length;
+    setSelectedCameraIndex(nextIndex);
+    const nextCamId = cameras[nextIndex].id;
+    await startCamera(nextCamId);
   };
 
   const stopCamera = async () => {
@@ -112,7 +172,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           <div className="flex items-center gap-2">
             <Barcode size={20} className="text-[#1b367c]" />
             <h2 className="text-base font-extrabold text-[#1b367c]">
-              Leitor de Código de Barras / ID
+              Leitor de Código / QR Code
             </h2>
           </div>
           <button
@@ -126,14 +186,37 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
         <div className="p-4 space-y-4">
           {/* Camera View Area */}
-          <div className="relative bg-slate-900 rounded-xl overflow-hidden min-h-[220px] flex flex-col items-center justify-center border border-slate-700">
-            <div id="interactive-scanner" className={`w-full ${isCameraActive ? 'block' : 'hidden'}`} />
+          <div className="relative bg-slate-900 rounded-xl overflow-hidden min-h-[260px] flex flex-col items-center justify-center border border-slate-700">
+            <style>{`
+              #interactive-scanner video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+                border-radius: 0.75rem;
+              }
+              #interactive-scanner canvas {
+                max-width: 100% !important;
+              }
+            `}</style>
+
+            <div id="interactive-scanner" className={`w-full min-h-[260px] ${isCameraActive ? 'block' : 'hidden'}`} />
+
+            {isCameraActive && cameras.length > 1 && (
+              <button
+                type="button"
+                onClick={handleSwitchCamera}
+                className="absolute top-3 right-3 bg-slate-900/80 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg backdrop-blur-sm z-10 cursor-pointer"
+              >
+                <RefreshCw size={14} className="animate-spin-slow" />
+                <span>Trocar Câmera</span>
+              </button>
+            )}
 
             {!isCameraActive && (
               <div className="text-center p-6 text-slate-400 my-auto">
-                <Camera size={36} className="mx-auto mb-2 text-slate-500" />
+                <Camera size={40} className="mx-auto mb-2 text-slate-500" />
                 <p className="text-xs font-semibold mb-3 text-slate-300">
-                  Apunte a câmera para o Código de Barras (Code 128) da etiqueta
+                  Aponta a câmera do celular diretamente para o QR Code ou Código de Barras
                 </p>
                 {scanError && (
                   <p className="text-xs text-rose-400 bg-rose-950/60 p-2 rounded-lg mb-3">
@@ -142,8 +225,8 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={startCamera}
-                  className="bg-[#1b367c] hover:bg-[#13275b] text-white text-xs font-extrabold px-5 py-2.5 rounded-lg transition-colors shadow-md inline-flex items-center gap-2"
+                  onClick={() => startCamera()}
+                  className="bg-[#1b367c] hover:bg-[#13275b] text-white text-xs font-extrabold px-5 py-2.5 rounded-lg transition-colors shadow-md inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Camera size={16} />
                   <span>Abrir Câmera</span>
@@ -152,14 +235,19 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             )}
           </div>
 
+          <p className="text-[11px] text-center font-bold text-slate-500 bg-slate-100 p-2 rounded-lg border border-slate-200 flex items-center justify-center gap-1.5">
+            <Zap size={14} className="text-amber-500" />
+            <span>Posicione o QR Code no centro do quadrado da câmera.</span>
+          </p>
+
           {/* Quick Scanner Manual Input */}
-          <form onSubmit={handleApplyManual} className="space-y-2">
+          <form onSubmit={handleApplyManual} className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-slate-600 uppercase">
-                Leitor Sem Fio / Digitação Rápida
+                Leitor USB / Digitação
               </label>
               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">
-                USB/Bipador Pronto
+                Bipador Pronto
               </span>
             </div>
             <div className="flex gap-2">
@@ -167,13 +255,12 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 type="text"
                 value={manualCode}
                 onChange={e => setManualCode(e.target.value)}
-                placeholder="Escaneie com bipador USB ou digite..."
+                placeholder="Escaneie com leitor USB ou digite aqui..."
                 className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-[#1b367c]"
-                autoFocus
               />
               <button
                 type="submit"
-                className="bg-[#1b367c] hover:bg-[#13275b] text-white font-extrabold text-xs px-4 rounded-lg flex items-center gap-1 shadow-sm"
+                className="bg-[#1b367c] hover:bg-[#13275b] text-white font-extrabold text-xs px-4 rounded-lg flex items-center gap-1 shadow-sm cursor-pointer"
               >
                 <Check size={16} />
                 <span>Usar</span>
@@ -185,4 +272,5 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     </div>
   );
 };
+
 
