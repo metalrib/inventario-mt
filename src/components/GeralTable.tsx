@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { GeralItem, FilterState } from '../types';
-import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet } from 'lucide-react';
+import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square } from 'lucide-react';
 import { exportGeraisXLSX } from '../services/exporter';
 
 interface GeralTableProps {
   items: GeralItem[];
+  onRefresh?: () => void;
   onDeleteItem: (id: string | number) => void;
+  onDeleteBatch?: (ids: (string | number)[]) => void;
+  onClearAll: () => void;
   onUpdateItem: (id: string | number, updated: Partial<GeralItem>) => void;
   onOpenBatchPrint: (items: GeralItem[]) => void;
   onOpenSinglePrint: (item: GeralItem) => void;
@@ -13,7 +16,10 @@ interface GeralTableProps {
 
 export const GeralTable: React.FC<GeralTableProps> = ({
   items,
+  onRefresh,
   onDeleteItem,
+  onDeleteBatch,
+  onClearAll,
   onUpdateItem,
   onOpenBatchPrint,
   onOpenSinglePrint
@@ -57,12 +63,15 @@ export const GeralTable: React.FC<GeralTableProps> = ({
     return (dateA - dateB) * factor;
   });
 
+  // Totals
+  const totalQty = items.reduce((acc, i) => acc + (Number(i.quantidade) || 0), 0);
+
   // Batch Select Handlers
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedIds(sortedItems.map(i => i.id));
-    } else {
+  const handleSelectAll = () => {
+    if (selectedIds.length === sortedItems.length && sortedItems.length > 0) {
       setSelectedIds([]);
+    } else {
+      setSelectedIds(sortedItems.map(i => i.id));
     }
   };
 
@@ -76,6 +85,25 @@ export const GeralTable: React.FC<GeralTableProps> = ({
     const selectedItems = items.filter(i => selectedIds.includes(i.id));
     if (selectedItems.length > 0) {
       onOpenBatchPrint(selectedItems);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (confirm(`Tem certeza que deseja excluir os ${selectedIds.length} itens selecionados?`)) {
+      if (onDeleteBatch) {
+        onDeleteBatch(selectedIds);
+      } else {
+        selectedIds.forEach(id => onDeleteItem(id));
+      }
+      setSelectedIds([]);
+    }
+  };
+
+  const handleClearAllConfirm = () => {
+    if (confirm("Tem certeza que deseja apagar TODOS os itens e chapas da lista? Esta ação não pode ser desfeita.")) {
+      onClearAll();
+      setSelectedIds([]);
     }
   };
 
@@ -100,6 +128,32 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-200 space-y-4">
+      {/* Top Header Summary */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+        <div>
+          <h2 className="font-extrabold text-base text-[#1b367c] flex items-center gap-2">
+            <span>Chapas e Insumos Cadastrados</span>
+            <span className="text-xs font-bold px-2.5 py-0.5 bg-blue-100 text-[#1b367c] rounded-full">
+              {items.length} registros
+            </span>
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Total Registrado: <strong className="text-slate-800">{totalQty} unidades / peças</strong>
+          </p>
+        </div>
+
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw size={14} />
+            <span>Sincronizar</span>
+          </button>
+        )}
+      </div>
+
       {/* Search and Action Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative flex-1">
@@ -108,17 +162,17 @@ export const GeralTable: React.FC<GeralTableProps> = ({
             type="text"
             value={filters.search}
             onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
-            placeholder="Buscar por código (XXX.XXXX), descrição..."
+            placeholder="Buscar por código (XXX.XXXX), descrição, ID Nomus..."
             className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => exportGeraisXLSX(items)}
             disabled={items.length === 0}
-            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs px-4 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
+            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
             title="Exportar tabela de insumos e chapas para Excel (.xlsx)"
           >
             <FileSpreadsheet size={16} />
@@ -126,15 +180,39 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           </button>
 
           {selectedIds.length > 0 && (
-            <button
-              type="button"
-              onClick={handleBatchPrint}
-              className="bg-[#1b367c] hover:bg-[#13275b] text-white font-extrabold text-xs px-4 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md"
-            >
-              <Printer size={16} />
-              <span>Imprimir Lote ({selectedIds.length})</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleBatchPrint}
+                className="bg-[#1b367c] hover:bg-[#13275b] text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Printer size={16} />
+                <span>Imprimir Lote ({selectedIds.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                title="Excluir apenas os itens selecionados"
+              >
+                <Trash2 size={16} />
+                <span>Excluir ({selectedIds.length})</span>
+              </button>
+            </>
           )}
+
+          {/* Limpar Lista Button */}
+          <button
+            type="button"
+            onClick={handleClearAllConfirm}
+            disabled={items.length === 0}
+            className="bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-bold text-xs px-3.5 h-10 rounded-xl flex items-center gap-1.5 border border-slate-300 hover:border-rose-300 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Limpar todos os itens e chapas da lista"
+          >
+            <Trash2 size={15} className="text-rose-600" />
+            <span>Limpar Lista</span>
+          </button>
 
           <button
             type="button"
@@ -144,7 +222,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                 sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc'
               }))
             }
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 h-10 rounded-xl flex items-center gap-1 border border-slate-300"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 h-10 rounded-xl flex items-center gap-1 border border-slate-300 cursor-pointer"
           >
             <ArrowUpDown size={14} />
             <span>{filters.sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}</span>
@@ -158,12 +236,18 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           <thead>
             <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase tracking-wider">
               <th className="p-3 w-10 text-center">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.length > 0 && selectedIds.length === sortedItems.length}
-                  onChange={handleSelectAll}
-                  className="rounded border-slate-300 text-[#1b367c] focus:ring-[#1b367c]"
-                />
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="flex items-center justify-center cursor-pointer"
+                  title={selectedIds.length === sortedItems.length && sortedItems.length > 0 ? "Desmarcar todos" : "Selecionar todos"}
+                >
+                  {selectedIds.length > 0 && selectedIds.length === sortedItems.length ? (
+                    <CheckSquare size={16} className="text-[#1b367c]" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
+                </button>
               </th>
               <th className="p-3">Código de Barras</th>
               <th className="p-3">Código Item</th>
@@ -258,14 +342,14 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                           <button
                             type="button"
                             onClick={() => handleSaveEdit(item.id)}
-                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
+                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
                           >
                             <Check size={14} />
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
-                            className="p-1.5 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg"
+                            className="p-1.5 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg cursor-pointer"
                           >
                             <X size={14} />
                           </button>
@@ -283,12 +367,17 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                     }`}
                   >
                     <td className="p-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleSelect(item.id)}
-                        className="rounded border-slate-300 text-[#1b367c] focus:ring-[#1b367c]"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSelect(item.id)}
+                        className="cursor-pointer"
+                      >
+                        {isSelected ? (
+                          <CheckSquare size={16} className="text-[#1b367c]" />
+                        ) : (
+                          <Square size={16} className="text-slate-300" />
+                        )}
+                      </button>
                     </td>
                     <td className="p-3 font-mono font-bold text-[#1b367c]">
                       {item.id_nomus || <span className="text-slate-400 font-normal italic text-xs">Sem ID</span>}
@@ -317,7 +406,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                           type="button"
                           onClick={() => onOpenSinglePrint(item)}
                           title="Imprimir Etiqueta"
-                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#1b367c] rounded-lg transition-colors border border-blue-200"
+                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#1b367c] rounded-lg transition-colors border border-blue-200 cursor-pointer"
                         >
                           <Tag size={15} />
                         </button>
@@ -325,7 +414,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                           type="button"
                           onClick={() => handleStartEdit(item)}
                           title="Editar Item"
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors cursor-pointer"
                         >
                           <Edit2 size={15} />
                         </button>
@@ -337,7 +426,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                             }
                           }}
                           title="Excluir Item"
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -349,6 +438,67 @@ export const GeralTable: React.FC<GeralTableProps> = ({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Footer Batch Actions */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedIds.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={handleBatchPrint}
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Printer size={15} />
+                <span>Imprimir Selecionados ({selectedIds.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Trash2 size={15} />
+                <span>Excluir Selecionados ({selectedIds.length})</span>
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onOpenBatchPrint(items)}
+            disabled={items.length === 0}
+            className="bg-[#1b367c] hover:bg-[#13275b] text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
+          >
+            <Printer size={15} />
+            <span>Etiquetas em Lote (Todos)</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportGeraisXLSX(items)}
+            disabled={items.length === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-initial cursor-pointer shadow-sm"
+            title="Exportar chapas e insumos para Excel (.xlsx)"
+          >
+            <FileSpreadsheet size={15} />
+            <span>Baixar Planilha XLSX</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClearAllConfirm}
+            disabled={items.length === 0}
+            className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50 cursor-pointer shadow-sm"
+            title="Limpar todos os itens e chapas da lista"
+          >
+            <Trash2 size={15} />
+            <span>Limpar Todos</span>
+          </button>
+        </div>
       </div>
     </div>
   );

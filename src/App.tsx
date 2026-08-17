@@ -29,6 +29,7 @@ import {
   deletePerfil,
   deleteBumper,
   deleteGeral,
+  deleteGeraisBatch,
   clearAllPerfis,
   clearAllBumpers,
   clearAllGerais,
@@ -195,6 +196,16 @@ export default function App() {
   const handleDeleteGeral = async (id: string | number) => {
     await deleteGeral(id);
     setGerais(prev => prev.filter(g => g.id !== id));
+  };
+
+  const handleClearGerais = async () => {
+    await clearAllGerais();
+    setGerais([]);
+  };
+
+  const handleDeleteBatchGerais = async (ids: (string | number)[]) => {
+    await deleteGeraisBatch(ids);
+    setGerais(prev => prev.filter(g => !ids.includes(g.id)));
   };
 
   // Label Printing Helpers
@@ -410,7 +421,10 @@ export default function App() {
 
             <GeralTable
               items={gerais}
+              onRefresh={loadData}
               onDeleteItem={handleDeleteGeral}
+              onDeleteBatch={handleDeleteBatchGerais}
+              onClearAll={handleClearGerais}
               onUpdateItem={handleEditGeral}
               onOpenBatchPrint={handlePrintBatchGerais}
               onOpenSinglePrint={handlePrintSingleGeral}

@@ -610,6 +610,25 @@ export async function deleteGeral(id: string | number): Promise<void> {
   saveLocalGerais(updated);
 }
 
+export async function deleteGeraisBatch(ids: (string | number)[]): Promise<void> {
+  const current = getLocalGerais();
+  const client = getSupabaseClient();
+  if (client) {
+    const realIds = ids.filter(id => typeof id === 'number' || !String(id).startsWith('local_'));
+    if (realIds.length > 0) {
+      try {
+        await client.from('inventario_geral').delete().in('id', realIds);
+      } catch (e) {
+        console.warn("Cloud batch delete failed:", e);
+      }
+    }
+  }
+
+  const idSet = new Set(ids.map(String));
+  const updated = current.filter(g => !idSet.has(String(g.id)));
+  saveLocalGerais(updated);
+}
+
 export async function clearAllGerais(): Promise<void> {
   const current = getLocalGerais();
   const client = getSupabaseClient();
