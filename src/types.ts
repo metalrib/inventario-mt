@@ -45,6 +45,19 @@ export interface ProfileCatalogItem {
   medidasPadrao?: number[];
 }
 
+export interface ProductCatalogItem {
+  id: string | number;
+  codigo: string;
+  descricao: string;
+  categoria?: string;
+  unidade?: string;
+  comprimento_padrao_mm?: number;
+  largura_padrao_mm?: number;
+  espessura_padrao_mm?: number;
+  medida_padrao_mm?: number;
+  created_at?: string;
+}
+
 export interface AppConfig {
   supabaseUrl: string;
   supabaseKey: string;

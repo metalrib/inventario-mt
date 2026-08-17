@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { PerfilItem, BumperItem, GeralItem } from '../types';
+import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem } from '../types';
 
 export function exportPerfisXLSX(items: PerfilItem[]) {
   if (items.length === 0) return;
@@ -237,6 +237,108 @@ export function parseBackupJSON(file: File): Promise<{ perfis: PerfilItem[]; bum
     };
     reader.onerror = () => reject(new Error("Falha ao ler arquivo de backup."));
     reader.readAsText(file);
+  });
+}
+
+export function exportCatalogXLSX(items: ProductCatalogItem[]) {
+  if (items.length === 0) return;
+
+  const dataToExport = items.map(item => ({
+    'Código': item.codigo,
+    'Descrição Detalhada': item.descricao,
+    'Categoria': item.categoria || 'Geral',
+    'Unidade Padrão': item.unidade || 'peças',
+    'Comprimento Padrão (mm)': item.comprimento_padrao_mm || '',
+    'Largura Padrão (mm)': item.largura_padrao_mm || '',
+    'Espessura Padrão (mm)': item.espessura_padrao_mm || '',
+    'Medida Linear Padrão (mm)': item.medida_padrao_mm || ''
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+  worksheet['!cols'] = [
+    { wch: 18 },
+    { wch: 45 },
+    { wch: 16 },
+    { wch: 15 },
+    { wch: 22 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 24 }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Catálogo de Produtos");
+  XLSX.writeFile(workbook, `Metalrib_Catalogo_Produtos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export function parseCatalogExcel(file: File): Promise<ProductCatalogItem[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (rows.length < 2) {
+          throw new Error("A planilha está vazia ou sem linhas de dados.");
+        }
+
+        // Find header index
+        const headerRow: string[] = (rows[0] || []).map((h: any) => String(h || '').toLowerCase().trim());
+        const colCodigo = headerRow.findIndex(h => h.includes('código') || h.includes('codigo') || h.includes('cod'));
+        const colDesc = headerRow.findIndex(h => h.includes('descri') || h.includes('nome') || h.includes('item'));
+        const colCat = headerRow.findIndex(h => h.includes('categoria') || h.includes('tipo') || h.includes('grupo'));
+        const colUnid = headerRow.findIndex(h => h.includes('unidade') || h.includes('unid') || h.includes('un'));
+        const colComp = headerRow.findIndex(h => h.includes('comprimento') || h.includes('comp'));
+        const colLarg = headerRow.findIndex(h => h.includes('largura') || h.includes('larg'));
+        const colEsp = headerRow.findIndex(h => h.includes('espessura') || h.includes('esp'));
+        const colMedida = headerRow.findIndex(h => h.includes('medida') || h.includes('linear'));
+
+        if (colCodigo === -1) {
+          throw new Error("Não foi possível encontrar a coluna 'Código' na planilha.");
+        }
+
+        const items: ProductCatalogItem[] = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          const rawCodigo = String(row[colCodigo] || '').trim();
+          if (!rawCodigo) continue;
+
+          const rawDesc = colDesc !== -1 && row[colDesc] ? String(row[colDesc]).trim() : rawCodigo;
+          const rawCat = colCat !== -1 && row[colCat] ? String(row[colCat]).trim() : 'Geral';
+          const rawUnid = colUnid !== -1 && row[colUnid] ? String(row[colUnid]).trim() : 'peças';
+          const comp = colComp !== -1 && row[colComp] ? Number(row[colComp]) || undefined : undefined;
+          const larg = colLarg !== -1 && row[colLarg] ? Number(row[colLarg]) || undefined : undefined;
+          const esp = colEsp !== -1 && row[colEsp] ? Number(row[colEsp]) || undefined : undefined;
+          const med = colMedida !== -1 && row[colMedida] ? Number(row[colMedida]) || undefined : undefined;
+
+          items.push({
+            id: `imported_${Date.now()}_${i}`,
+            codigo: rawCodigo.toUpperCase(),
+            descricao: rawDesc,
+            categoria: rawCat,
+            unidade: rawUnid,
+            comprimento_padrao_mm: comp,
+            largura_padrao_mm: larg,
+            espessura_padrao_mm: esp,
+            medida_padrao_mm: med,
+            created_at: new Date().toISOString()
+          });
+        }
+
+        resolve(items);
+      } catch (err: any) {
+        reject(new Error(err?.message || "Erro ao processar planilha Excel."));
+      }
+    };
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
+    reader.readAsArrayBuffer(file);
   });
 }
 

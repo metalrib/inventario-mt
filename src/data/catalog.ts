@@ -1,4 +1,4 @@
-import { ProfileCatalogItem } from '../types';
+import { ProfileCatalogItem, ProductCatalogItem } from '../types';
 
 export const CATALOGO_PERFIS: ProfileCatalogItem[] = [
   {
@@ -107,3 +107,240 @@ export const CATALOGO_PERFIS: ProfileCatalogItem[] = [
     medidasPadrao: [1000, 2000, 3000, 6000]
   }
 ];
+
+export const DEFAULT_PRODUCT_CATALOG: ProductCatalogItem[] = [
+  // Chapas de Aço Carbono FQ e Insumos Metalrib
+  {
+    id: "prod_023_0105",
+    codigo: "023.0105",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 12.50",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 12.50
+  },
+  {
+    id: "prod_023_0096",
+    codigo: "023.0096",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 2.65",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 2.65
+  },
+  {
+    id: "prod_023_0108",
+    codigo: "023.0108",
+    descricao: "CHAPA AC FQ - 1200 X 2.65 X MT",
+    categoria: "Chapas",
+    unidade: "metros",
+    comprimento_padrao_mm: 1000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 2.65
+  },
+  {
+    id: "prod_023_0107",
+    codigo: "023.0107",
+    descricao: "CHAPA AC FQ - 1200 X 2.0 X MT",
+    categoria: "Chapas",
+    unidade: "metros",
+    comprimento_padrao_mm: 1000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 2.00
+  },
+  {
+    id: "prod_023_0095",
+    codigo: "023.0095",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 2.0",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 2.00
+  },
+  {
+    id: "prod_023_0101",
+    codigo: "023.0101",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 4.75",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 4.75
+  },
+  {
+    id: "prod_023_0110",
+    codigo: "023.0110",
+    descricao: "CHAPA AC FQ - 1200 X 4.75 X MT",
+    categoria: "Chapas",
+    unidade: "metros",
+    comprimento_padrao_mm: 1000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 4.75
+  },
+  {
+    id: "prod_023_0113",
+    codigo: "023.0113",
+    descricao: "CHAPA AC FQ - 1200 X 9.5 X MT",
+    categoria: "Chapas",
+    unidade: "metros",
+    comprimento_padrao_mm: 1000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 9.50
+  },
+  {
+    id: "prod_023_0103",
+    codigo: "023.0103",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 8.00",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 8.00
+  },
+  {
+    id: "prod_023_0099",
+    codigo: "023.0099",
+    descricao: "CHAPA AC FQ - 3000 X 1200 X 3.75",
+    categoria: "Chapas",
+    unidade: "chapas",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 3.75
+  },
+  {
+    id: "prod_023_0109",
+    codigo: "023.0109",
+    descricao: "CHAPA AC FQ - 1200 X 3.75 X MT",
+    categoria: "Chapas",
+    unidade: "metros",
+    comprimento_padrao_mm: 1000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 3.75
+  },
+
+  // Perfis de Alumínio & Aço
+  {
+    id: "prod_022_0017",
+    codigo: "022.0017",
+    descricao: "PERFIL VAI E VEM",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0011",
+    codigo: "022.0011",
+    descricao: "TUBO RETANGULAR (50,80 X 38,10 X 1,58)",
+    categoria: "Tubos",
+    unidade: "barras",
+    medida_padrao_mm: 6000
+  },
+  {
+    id: "prod_022_0002",
+    codigo: "022.0002",
+    descricao: "EXTERNO (LGT)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 2500
+  },
+  {
+    id: "prod_022_0004",
+    codigo: "022.0004",
+    descricao: "EXTERNO (HD)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 2500
+  },
+  {
+    id: "prod_022_0016",
+    codigo: "022.0016",
+    descricao: "PERFIL U (37,30 X 15,00 X 1,58)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0015",
+    codigo: "022.0015",
+    descricao: "PERFIL U (25,40 X 25,40 X 3,17)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0014",
+    codigo: "022.0014",
+    descricao: "PERFIL L (38,10 X 3,17)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0013",
+    codigo: "022.0013",
+    descricao: "PERFIL L (25,40 X 1,58)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0012",
+    codigo: "022.0012",
+    descricao: "PERFIL L (19,05 X 1,58)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 2000
+  },
+  {
+    id: "prod_022_0001",
+    codigo: "022.0001",
+    descricao: "OFFICE DOOR DE CORRER (48 X 48)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0003",
+    codigo: "022.0003",
+    descricao: "INTERNO (LGT)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 2500
+  },
+  {
+    id: "prod_022_0005",
+    codigo: "022.0005",
+    descricao: "INTERNO (HD)",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 2500
+  },
+  {
+    id: "prod_022_0006",
+    codigo: "022.0006",
+    descricao: "GUIA INFERIOR",
+    categoria: "Perfis",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  },
+  {
+    id: "prod_022_0129",
+    codigo: "022.0129",
+    descricao: "BASE GAXETA U",
+    categoria: "Gaxetas",
+    unidade: "barras",
+    medida_padrao_mm: 2400
+  },
+  {
+    id: "prod_022_0129_c",
+    codigo: "022.0129-C",
+    descricao: "CHATO 12,07 X 3,17 (1/2 X 1/8)",
+    categoria: "Barras",
+    unidade: "barras",
+    medida_padrao_mm: 3000
+  }
+];
+

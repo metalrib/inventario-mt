@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { PerfilItem, BumperItem, GeralItem, AppConfig } from '../types';
+import { PerfilItem, BumperItem, GeralItem, AppConfig, ProductCatalogItem } from '../types';
+import { DEFAULT_PRODUCT_CATALOG } from '../data/catalog';
 
 const DEFAULT_SUPABASE_URL = "https://mzpmvmuthgnrlcrqpvru.supabase.co"; 
 const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cG12bXV0aGducmxjcnFwdnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MTExOTcsImV4cCI6MjEwMTA4NzE5N30.zHErOtDt_zECvOct7ZwX4934BCI23ZuKRaHfdmj9fzg";
@@ -644,4 +645,169 @@ export async function clearAllGerais(): Promise<void> {
   }
   saveLocalGerais([]);
 }
+
+// ----------------------------------------------------
+// PRODUCT CATALOG (BASE DE ITENS / PRODUTOS)
+// ----------------------------------------------------
+
+export function getLocalCatalog(): ProductCatalogItem[] {
+  try {
+    const raw = localStorage.getItem('metalrib_product_catalog');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Error reading local catalog:", e);
+  }
+  // Initialize with DEFAULT_PRODUCT_CATALOG if empty
+  saveLocalCatalog(DEFAULT_PRODUCT_CATALOG);
+  return DEFAULT_PRODUCT_CATALOG;
+}
+
+export function saveLocalCatalog(items: ProductCatalogItem[]) {
+  localStorage.setItem('metalrib_product_catalog', JSON.stringify(items));
+}
+
+export async function fetchCatalog(): Promise<ProductCatalogItem[]> {
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('catalogo_produtos')
+        .select('*')
+        .order('codigo', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        saveLocalCatalog(data);
+        return data;
+      }
+    } catch (e) {
+      console.warn("Supabase fetch catalog exception (using local fallback):", e);
+    }
+  }
+  return getLocalCatalog();
+}
+
+export async function saveCatalogProduct(item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }): Promise<ProductCatalogItem> {
+  const current = getLocalCatalog();
+  const client = getSupabaseClient();
+
+  const formattedCode = item.codigo.trim().toUpperCase();
+  const existingIdx = current.findIndex(p => p.codigo.trim().toUpperCase() === formattedCode);
+
+  let savedItem: ProductCatalogItem;
+
+  if (item.id && existingIdx !== -1) {
+    savedItem = {
+      ...current[existingIdx],
+      ...item,
+      id: item.id,
+      codigo: formattedCode
+    };
+    current[existingIdx] = savedItem;
+  } else if (existingIdx !== -1) {
+    savedItem = {
+      ...current[existingIdx],
+      ...item,
+      codigo: formattedCode
+    };
+    current[existingIdx] = savedItem;
+  } else {
+    savedItem = {
+      ...item,
+      id: item.id || `local_prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      codigo: formattedCode,
+      created_at: item.created_at || new Date().toISOString()
+    };
+    current.unshift(savedItem);
+  }
+
+  saveLocalCatalog(current);
+
+  // Try saving to Supabase if connected
+  if (client) {
+    try {
+      const payload = {
+        codigo: savedItem.codigo,
+        descricao: savedItem.descricao,
+        categoria: savedItem.categoria || 'Geral',
+        unidade: savedItem.unidade || 'peças',
+        comprimento_padrao_mm: savedItem.comprimento_padrao_mm || null,
+        largura_padrao_mm: savedItem.largura_padrao_mm || null,
+        espessura_padrao_mm: savedItem.espessura_padrao_mm || null,
+        medida_padrao_mm: savedItem.medida_padrao_mm || null
+      };
+
+      const { data, error } = await client
+        .from('catalogo_produtos')
+        .upsert(payload, { onConflict: 'codigo' })
+        .select()
+        .single();
+
+      if (!error && data) {
+        savedItem.id = data.id;
+        const updated = getLocalCatalog().map(p => p.codigo.toUpperCase() === formattedCode ? { ...p, id: data.id } : p);
+        saveLocalCatalog(updated);
+      }
+    } catch (e) {
+      console.warn("Supabase save catalog item exception:", e);
+    }
+  }
+
+  return savedItem;
+}
+
+export async function deleteCatalogProduct(id: string | number): Promise<void> {
+  const current = getLocalCatalog();
+  const target = current.find(p => p.id === id);
+
+  const client = getSupabaseClient();
+  if (client && target) {
+    try {
+      await client.from('catalogo_produtos').delete().or(`id.eq.${id},codigo.eq.${target.codigo}`);
+    } catch (e) {
+      console.warn("Supabase delete catalog item exception:", e);
+    }
+  }
+
+  const updated = current.filter(p => p.id !== id);
+  saveLocalCatalog(updated);
+}
+
+export async function resetCatalogToDefaults(): Promise<ProductCatalogItem[]> {
+  saveLocalCatalog(DEFAULT_PRODUCT_CATALOG);
+  return DEFAULT_PRODUCT_CATALOG;
+}
+
+export function findCatalogProductByCode(code: string): ProductCatalogItem | undefined {
+  if (!code) return undefined;
+  const clean = code.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const catalog = getLocalCatalog();
+
+  // 1. Exact match
+  const exact = catalog.find(p => p.codigo.trim().toLowerCase() === code.trim().toLowerCase());
+  if (exact) return exact;
+
+  // 2. Normalized match (ignoring dots, dashes, spaces)
+  const normalized = catalog.find(p => {
+    const pClean = p.codigo.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    return pClean === clean;
+  });
+  if (normalized) return normalized;
+
+  // 3. Substring match if clean has length >= 4
+  if (clean.length >= 4) {
+    const partial = catalog.find(p => {
+      const pClean = p.codigo.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      return pClean.includes(clean) || clean.includes(pClean);
+    });
+    if (partial) return partial;
+  }
+
+  return undefined;
+}
+
 

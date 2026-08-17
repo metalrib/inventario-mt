@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, Settings, Camera, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Settings, Camera, RefreshCw, BookOpen, Package } from 'lucide-react';
 
 interface HeaderProps {
   isOnline: boolean;
@@ -7,6 +7,8 @@ interface HeaderProps {
   onSyncNow?: () => void;
   onOpenSettings: () => void;
   onOpenScanner: () => void;
+  onOpenCatalog?: () => void;
+  catalogCount?: number;
   totalPerfisMeters: number;
   totalBumpersQty: number;
 }
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSyncNow,
   onOpenSettings,
   onOpenScanner,
+  onOpenCatalog,
+  catalogCount = 0,
   totalPerfisMeters,
   totalBumpersQty,
 }) => {
@@ -37,11 +41,11 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className="text-lg font-extrabold text-[#1b367c] leading-tight flex items-center gap-2">
             Coleta PCP
             <span className="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-[#1b367c] border border-blue-200 rounded-full">
-              v2.0 Pro
+              v2.5 Pro
             </span>
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Controle Inteligente de Estoque, Retalhos & Bumpers
+            Controle Inteligente de Estoque, Chapas, Insumos & Retalhos
           </p>
         </div>
       </div>
@@ -74,12 +78,12 @@ export const Header: React.FC<HeaderProps> = ({
             {isOnline ? (
               <>
                 <Wifi size={14} className="text-emerald-600 animate-pulse" />
-                <span>Online (Nuvem)</span>
+                <span>Online</span>
               </>
             ) : (
               <>
                 <WifiOff size={14} className="text-amber-600" />
-                <span>Offline (Cache)</span>
+                <span>Offline</span>
               </>
             )}
           </div>
@@ -98,22 +102,40 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
+        {/* Product Catalog Button */}
+        {onOpenCatalog && (
+          <button
+            type="button"
+            onClick={onOpenCatalog}
+            className="bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-[#1b367c] font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 border border-blue-200 cursor-pointer shadow-xs"
+            title="Gerenciar Catálogo & Base de Produtos (Auto-completar)"
+          >
+            <BookOpen size={15} className="text-[#1b367c]" />
+            <span className="hidden sm:inline">Catálogo</span>
+            {catalogCount > 0 && (
+              <span className="text-[10px] bg-[#1b367c] text-white font-black px-1.5 py-0.2 rounded-full">
+                {catalogCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Camera Scanner Trigger */}
         <button
           type="button"
           onClick={onOpenScanner}
-          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-300"
+          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-300 cursor-pointer"
           title="Escanear Código de Barras / QR Code com Câmera"
         >
           <Camera size={15} className="text-[#1b367c]" />
-          <span className="hidden sm:inline">Escanear ID</span>
+          <span className="hidden sm:inline">Escanear</span>
         </button>
 
         {/* Settings Button */}
         <button
           type="button"
           onClick={onOpenSettings}
-          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs p-2 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-300"
+          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs p-2 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-300 cursor-pointer"
           title="Configurações de Conexão e Impressão"
         >
           <Settings size={16} className="text-slate-600" />
@@ -122,3 +144,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

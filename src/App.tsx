@@ -9,17 +9,22 @@ import { BumperTable } from './components/BumperTable';
 import { GeralForm } from './components/GeralForm';
 import { GeralTable } from './components/GeralTable';
 import { CatalogModal } from './components/CatalogModal';
+import { ProductCatalogModal } from './components/ProductCatalogModal';
 import { LabelPrintModal, PrintItem } from './components/LabelPrintModal';
 import { EditModal } from './components/EditModal';
 import { ScannerModal } from './components/ScannerModal';
 import { ScanResultModal } from './components/ScanResultModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MetricsDashboard } from './components/MetricsDashboard';
-import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, AppConfig } from './types';
+import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, ProductCatalogItem, AppConfig } from './types';
 import {
   fetchPerfis,
   fetchBumpers,
   fetchGerais,
+  fetchCatalog,
+  saveCatalogProduct,
+  deleteCatalogProduct,
+  resetCatalogToDefaults,
   insertPerfil,
   insertBumper,
   insertGeral,
@@ -49,10 +54,14 @@ export default function App() {
   const [perfis, setPerfis] = useState<PerfilItem[]>([]);
   const [bumpers, setBumpers] = useState<BumperItem[]>([]);
   const [gerais, setGerais] = useState<GeralItem[]>([]);
+  const [productCatalog, setProductCatalog] = useState<ProductCatalogItem[]>([]);
 
   // Modals state
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<ProfileCatalogItem | null>(null);
+
+  const [isProductCatalogOpen, setIsProductCatalogOpen] = useState(false);
+  const [prefilledProductItem, setPrefilledProductItem] = useState<ProductCatalogItem | null>(null);
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printItems, setPrintItems] = useState<PrintItem[]>([]);
@@ -74,10 +83,12 @@ export default function App() {
       const resPerfis = await fetchPerfis();
       const resBumpers = await fetchBumpers();
       const resGerais = await fetchGerais();
+      const catalogData = await fetchCatalog();
 
       setPerfis(resPerfis.data);
       setBumpers(resBumpers.data);
       setGerais(resGerais.data);
+      setProductCatalog(catalogData);
       setIsOnline(resPerfis.isOnline || resBumpers.isOnline || resGerais.isOnline);
     } finally {
       if (showLoadingState) setIsSyncing(false);
@@ -208,6 +219,38 @@ export default function App() {
     setGerais(prev => prev.filter(g => !ids.includes(g.id)));
   };
 
+  // Product Catalog Handlers
+  const handleSaveCatalogProduct = async (item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }) => {
+    const saved = await saveCatalogProduct(item);
+    setProductCatalog(prev => {
+      const idx = prev.findIndex(p => p.codigo.toUpperCase() === saved.codigo.toUpperCase());
+      if (idx !== -1) {
+        const next = [...prev];
+        next[idx] = saved;
+        return next;
+      }
+      return [saved, ...prev];
+    });
+  };
+
+  const handleDeleteCatalogProduct = async (id: string | number) => {
+    await deleteCatalogProduct(id);
+    setProductCatalog(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleResetCatalogDefaults = async () => {
+    const defaults = await resetCatalogToDefaults();
+    setProductCatalog(defaults);
+  };
+
+  const handleImportCatalogProducts = async (items: ProductCatalogItem[]) => {
+    for (const item of items) {
+      await saveCatalogProduct(item);
+    }
+    const updated = await fetchCatalog();
+    setProductCatalog(updated);
+  };
+
   // Label Printing Helpers
   const handlePrintSinglePerfil = (item: PerfilItem) => {
     setPrintItems([{
@@ -314,6 +357,8 @@ export default function App() {
         onSyncNow={handleManualSync}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
+        onOpenCatalog={() => setIsProductCatalogOpen(true)}
+        catalogCount={productCatalog.length}
         totalPerfisMeters={totalPerfisMeters}
         totalBumpersQty={totalBumpersQty}
       />
@@ -417,6 +462,10 @@ export default function App() {
               operadorPadrao={config.operadorPadrao}
               autoImprimirAoSalvar={config.autoImprimirAoSalvar}
               onOpenPrintModal={handlePrintSingleGeral}
+              catalog={productCatalog}
+              onOpenCatalog={() => setIsProductCatalogOpen(true)}
+              onSaveToCatalog={handleSaveCatalogProduct}
+              prefilledItem={prefilledProductItem}
             />
 
             <GeralTable
@@ -442,6 +491,20 @@ export default function App() {
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
         onSelectProfile={item => setSelectedCatalogItem(item)}
+      />
+
+      <ProductCatalogModal
+        isOpen={isProductCatalogOpen}
+        onClose={() => setIsProductCatalogOpen(false)}
+        catalog={productCatalog}
+        onSaveItem={handleSaveCatalogProduct}
+        onDeleteItem={handleDeleteCatalogProduct}
+        onResetDefaults={handleResetCatalogDefaults}
+        onImportItems={handleImportCatalogProducts}
+        onSelectForUse={item => {
+          setPrefilledProductItem(item);
+          setActiveTab('gerais');
+        }}
       />
 
       <LabelPrintModal
@@ -492,7 +555,7 @@ export default function App() {
         onAddGeral={async g => {
           const saved = await insertGeral({ ...g, operador: config.operadorPadrao });
           setGerais(prev => [saved, ...prev.filter(i => String(i.id) !== String(saved.id))]);
-          setActiveTab('geral');
+          setActiveTab('gerais');
         }}
         onIncrementPerfil={async (id, newQty) => {
           await handleEditPerfil(id, { quantidade: newQty });
