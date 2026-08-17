@@ -142,7 +142,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
         {/* Header */}
-        <div className="p-4 bg-[#1b367c] text-white flex items-center justify-between">
+        <div className="shrink-0 p-4 bg-[#1b367c] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-white/10 rounded-xl">
               <Package size={22} className="text-sky-300" />
@@ -170,7 +170,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
         </div>
 
         {/* Action Toolbar */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="shrink-0 p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -230,27 +230,44 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="px-4 py-2 bg-white border-b border-slate-100 flex gap-1.5 overflow-x-auto scrollbar-none">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-[#1b367c] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* Category Pills (Filters) */}
+        <div className="shrink-0 px-3 py-2 bg-slate-100/90 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto min-h-[44px]">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-1 pr-1 hidden sm:inline">
+            Filtrar:
+          </span>
+          {categories.map(cat => {
+            const count = cat === 'Todos'
+              ? catalog.length
+              : catalog.filter(i => (i.categoria || 'Geral') === cat).length;
+            const isSelected = selectedCategory === cat;
+
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`h-8 px-3 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-[#1b367c] text-white border-[#1b367c] shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-200 border-slate-300 shadow-2xs'
+                }`}
+              >
+                <span>{cat}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Add/Edit Modal Inset Form */}
         {showAddForm && (
-          <form onSubmit={handleSaveForm} className="p-4 bg-blue-50/80 border-b-2 border-blue-200 space-y-3">
+          <form onSubmit={handleSaveForm} className="shrink-0 p-4 bg-blue-50/90 border-b-2 border-blue-200 space-y-3 overflow-y-auto max-h-[45vh]">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#1b367c] flex items-center gap-1.5">
                 <Sparkles size={15} className="text-amber-500" />
@@ -388,10 +405,10 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
         )}
 
         {/* Product Items Table */}
-        <div className="overflow-y-auto flex-1 p-3">
+        <div className="overflow-y-auto flex-1 min-h-0 p-3">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase">
+            <thead className="sticky top-0 bg-slate-100 z-10">
+              <tr className="border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase shadow-2xs">
                 <th className="p-2.5">Código</th>
                 <th className="p-2.5">Descrição Detalhada</th>
                 <th className="p-2.5 text-center">Categoria</th>
@@ -483,7 +500,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className="shrink-0 p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <Info size={14} className="text-[#1b367c]" />
             <span>Dica: Nos formulários de cadastro, basta digitar o código (ex: 023.0105) para autocompletar.</span>

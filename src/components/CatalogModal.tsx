@@ -33,7 +33,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3">
       <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="shrink-0 p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div>
             <h2 className="text-lg font-extrabold text-[#1b367c]">
               Catálogo de Perfis Metalrib
@@ -45,14 +45,14 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Search & Category Filter */}
-        <div className="p-4 border-b border-slate-200 space-y-3 bg-white">
+        <div className="shrink-0 p-4 border-b border-slate-200 space-y-3 bg-white">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
             <input
@@ -71,10 +71,10 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer border ${
                   selectedCategory === cat
-                    ? 'bg-[#1b367c] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#1b367c] text-white border-[#1b367c] shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
                 }`}
               >
                 {cat}
