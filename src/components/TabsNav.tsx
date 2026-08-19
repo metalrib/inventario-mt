@@ -19,20 +19,20 @@ export const TabsNav: React.FC<TabsNavProps> = ({
   geraisCount
 }) => {
   return (
-    <nav className="flex flex-wrap sm:flex-nowrap bg-slate-200 p-1 rounded-xl mb-4 gap-1">
+    <nav className="grid grid-cols-2 sm:grid-cols-4 bg-slate-200 p-1.5 rounded-xl mb-4 gap-1.5 w-full">
       <button
         type="button"
         onClick={() => onChangeTab('perfis')}
-        className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+        className={`w-full py-2.5 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
           activeTab === 'perfis'
             ? 'bg-[#1b367c] text-white shadow-md'
-            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/50'
+            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
         }`}
       >
-        <Layers size={18} />
-        <span>Perfis & Retalhos</span>
+        <Layers size={17} className="shrink-0" />
+        <span className="truncate">Perfis & Retalhos</span>
         <span
-          className={`text-xs px-2 py-0.5 rounded-full font-extrabold ${
+          className={`text-xs px-1.5 py-0.2 rounded-full font-extrabold shrink-0 ${
             activeTab === 'perfis'
               ? 'bg-blue-400/30 text-white'
               : 'bg-slate-300 text-slate-700'
@@ -45,16 +45,16 @@ export const TabsNav: React.FC<TabsNavProps> = ({
       <button
         type="button"
         onClick={() => onChangeTab('bumpers')}
-        className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+        className={`w-full py-2.5 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
           activeTab === 'bumpers'
             ? 'bg-[#1b367c] text-white shadow-md'
-            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/50'
+            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
         }`}
       >
-        <Shield size={18} />
-        <span>Bumpers</span>
+        <Shield size={17} className="shrink-0" />
+        <span className="truncate">Bumpers</span>
         <span
-          className={`text-xs px-2 py-0.5 rounded-full font-extrabold ${
+          className={`text-xs px-1.5 py-0.2 rounded-full font-extrabold shrink-0 ${
             activeTab === 'bumpers'
               ? 'bg-blue-400/30 text-white'
               : 'bg-slate-300 text-slate-700'
@@ -67,16 +67,16 @@ export const TabsNav: React.FC<TabsNavProps> = ({
       <button
         type="button"
         onClick={() => onChangeTab('gerais')}
-        className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+        className={`w-full py-2.5 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
           activeTab === 'gerais'
             ? 'bg-[#1b367c] text-white shadow-md'
-            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/50'
+            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
         }`}
       >
-        <Package size={18} />
-        <span>Chapas & Insumos</span>
+        <Package size={17} className="shrink-0" />
+        <span className="truncate">Chapas & Insumos</span>
         <span
-          className={`text-xs px-2 py-0.5 rounded-full font-extrabold ${
+          className={`text-xs px-1.5 py-0.2 rounded-full font-extrabold shrink-0 ${
             activeTab === 'gerais'
               ? 'bg-blue-400/30 text-white'
               : 'bg-slate-300 text-slate-700'
@@ -89,14 +89,14 @@ export const TabsNav: React.FC<TabsNavProps> = ({
       <button
         type="button"
         onClick={() => onChangeTab('metrics')}
-        className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+        className={`w-full py-2.5 px-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
           activeTab === 'metrics'
             ? 'bg-[#1b367c] text-white shadow-md'
-            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/50'
+            : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
         }`}
       >
-        <PieChart size={18} />
-        <span>Dashboard</span>
+        <PieChart size={17} className="shrink-0" />
+        <span className="truncate">Dashboard</span>
       </button>
     </nav>
   );

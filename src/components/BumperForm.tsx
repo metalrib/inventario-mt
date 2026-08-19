@@ -284,10 +284,10 @@ export const BumperForm: React.FC<BumperFormProps> = ({
         <button
           type="submit"
           disabled={isSaving}
-          className="w-full h-12 bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+          className="w-full h-12 bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer"
         >
           <Plus size={18} />
-          <span>{isSaving ? 'Salvando...' : '➕ Salvar Bumper Online'}</span>
+          <span>{isSaving ? 'Salvando...' : 'Salvar Bumper Online'}</span>
         </button>
       </form>
     </div>

@@ -56,36 +56,36 @@ export const BackupBar: React.FC<BackupBarProps> = ({
 
 
   return (
-    <div className="bg-white border border-slate-300 rounded-xl p-3 mb-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-xs font-black uppercase text-[#1b367c] tracking-wide">
+    <div className="bg-white border border-slate-300 rounded-xl p-3 mb-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 w-full">
+      <div className="flex items-center gap-2 text-xs font-black uppercase text-[#1b367c] tracking-wide shrink-0">
         <Database size={16} className="text-[#1b367c]" />
         <span>Backup & Histórico do Inventário</span>
       </div>
 
-      <div className="flex items-center flex-wrap justify-end gap-2 w-full sm:w-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-wrap items-center justify-end gap-2 w-full md:w-auto">
         <button
           type="button"
           onClick={handleExportExcelAll}
-          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-emerald-700 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+          className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3 py-2 rounded-lg border border-emerald-700 transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
           title="Exportar todas as abas do inventário para planilha Excel (.xlsx)"
         >
           <FileSpreadsheet size={14} />
-          <span>Exportar Tudo (.XLSX)</span>
+          <span>Exportar (.XLSX)</span>
         </button>
 
         <button
           type="button"
           onClick={handleExportJSON}
-          className="flex-1 sm:flex-initial bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
+          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
         >
           <Download size={14} className="text-[#1b367c]" />
-          <span>Salvar Backup (.JSON)</span>
+          <span>Salvar (.JSON)</span>
         </button>
 
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex-1 sm:flex-initial bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
+          className="bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
         >
           <Upload size={14} className="text-[#1b367c]" />
           <span>Carregar Backup</span>
@@ -94,7 +94,7 @@ export const BackupBar: React.FC<BackupBarProps> = ({
         <button
           type="button"
           onClick={onPrintFullReport}
-          className="flex-1 sm:flex-initial bg-blue-50 hover:bg-blue-100 text-[#1b367c] text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1.5"
+          className="bg-blue-50 hover:bg-blue-100 text-[#1b367c] text-xs font-bold px-3 py-2 rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
           title="Imprimir relatório completo de contagem"
         >
           <Printer size={14} />

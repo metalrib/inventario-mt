@@ -383,7 +383,7 @@ export default function App() {
   ].map(id => id.trim()).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-4 max-w-7xl mx-auto font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-3 md:p-4 max-w-7xl mx-auto font-sans w-full box-border">
       {/* App Header */}
       <Header
         isOnline={isOnline}
@@ -419,10 +419,10 @@ export default function App() {
       />
 
       {/* Main Tab Views */}
-      <main>
+      <main className="w-full">
         {activeTab === 'perfis' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-5 xl:col-span-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
+            <div className="md:col-span-5 xl:col-span-4">
               <PerfilForm
                 onSavePerfil={handleSavePerfil}
                 onOpenCatalog={() => setIsCatalogOpen(true)}
@@ -438,7 +438,7 @@ export default function App() {
               />
             </div>
 
-            <div className="lg:col-span-7 xl:col-span-8">
+            <div className="md:col-span-7 xl:col-span-8 min-w-0">
               <PerfilTable
                 perfis={perfis}
                 onRefresh={loadData}
@@ -457,8 +457,8 @@ export default function App() {
         )}
 
         {activeTab === 'bumpers' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-5 xl:col-span-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
+            <div className="md:col-span-5 xl:col-span-4">
               <BumperForm
                 onSaveBumper={handleSaveBumper}
                 manterMedidaBumpers={config.manterMedidaBumpers}
@@ -472,7 +472,7 @@ export default function App() {
               />
             </div>
 
-            <div className="lg:col-span-7 xl:col-span-8">
+            <div className="md:col-span-7 xl:col-span-8 min-w-0">
               <BumperTable
                 bumpers={bumpers}
                 onRefresh={loadData}
