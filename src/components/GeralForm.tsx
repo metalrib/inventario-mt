@@ -390,10 +390,15 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         </div>
 
         {/* Dimensões / Medidas em mm */}
-        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <span className="text-xs font-extrabold text-slate-700 uppercase block mb-2">
-            Medidas / Dimensões Físicas (mm)
-          </span>
+        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold text-slate-700 uppercase block">
+              Medidas / Dimensões Físicas (mm)
+            </span>
+            <span className="text-[10px] text-slate-500 font-bold bg-white px-2 py-0.5 rounded border border-slate-200">
+              Cálculo Automático de m²
+            </span>
+          </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -404,7 +409,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
                 type="number"
                 value={comprimentoMm}
                 onChange={e => setComprimentoMm(e.target.value)}
-                placeholder="Ex: 3000"
+                placeholder="Ex: 850"
                 className="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-white text-center"
               />
             </div>
@@ -417,7 +422,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
                 type="number"
                 value={larguraMm}
                 onChange={e => setLarguraMm(e.target.value)}
-                placeholder="Ex: 1200"
+                placeholder="Ex: 1250"
                 className="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-white text-center"
               />
             </div>
@@ -431,11 +436,26 @@ export const GeralForm: React.FC<GeralFormProps> = ({
                 step="0.01"
                 value={espessuraMm}
                 onChange={e => setEspessuraMm(e.target.value)}
-                placeholder="Ex: 12.50"
+                placeholder="Ex: 0.50"
                 className="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-white text-center"
               />
             </div>
           </div>
+
+          {/* Real-time m² preview badge */}
+          {Number(comprimentoMm) > 0 && Number(larguraMm) > 0 && (
+            <div className="bg-sky-50 border border-sky-200 rounded-lg p-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-xs text-sky-950">
+              <div className="flex items-center gap-2">
+                <Sparkles size={15} className="text-sky-600 shrink-0" />
+                <span>
+                  Área Unitária: <strong className="font-extrabold text-[#1b367c]">{((Number(comprimentoMm) * Number(larguraMm)) / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²</strong> / chapa
+                </span>
+              </div>
+              <div className="text-xs font-bold text-sky-900 bg-white/80 px-2 py-0.5 rounded border border-sky-200">
+                Área Total ({quantidade} {quantidade === 1 ? 'un' : 'unidades'}): <strong className="text-emerald-700 font-extrabold">{(((Number(comprimentoMm) * Number(larguraMm)) / 1000000) * quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²</strong>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Option to automatically remember new product in catalog */}

@@ -101,22 +101,33 @@ export function exportAllToXLSX(perfis: PerfilItem[], bumpers: BumperItem[], ger
   }
 
   if (gerais.length > 0) {
-    const geraisData = gerais.map((item, idx) => ({
-      'Nº Item': gerais.length - idx,
-      'ID Tag / Barcode': item.id_nomus,
-      'Código Item': item.codigo_item,
-      'Descrição': item.descricao_item,
-      'Comprimento (mm)': item.comprimento_mm,
-      'Largura (mm)': item.largura_mm,
-      'Espessura (mm)': item.espessura_mm,
-      'Quantidade': item.quantidade,
-      'Unidade': item.unidade,
-      'Data Cadastro': item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '',
-      'Operador': item.operador || 'Operador PCP'
-    }));
+    const geraisData = gerais.map((item, idx) => {
+      const areaUnit = (item.comprimento_mm && item.largura_mm)
+        ? Number(((item.comprimento_mm * item.largura_mm) / 1000000).toFixed(4))
+        : null;
+      const areaTotal = (areaUnit !== null)
+        ? Number((areaUnit * (item.quantidade || 1)).toFixed(4))
+        : null;
+
+      return {
+        'Nº Item': gerais.length - idx,
+        'ID Tag / Barcode': item.id_nomus,
+        'Código Item': item.codigo_item,
+        'Descrição': item.descricao_item,
+        'Comprimento (mm)': item.comprimento_mm,
+        'Largura (mm)': item.largura_mm,
+        'Espessura (mm)': item.espessura_mm,
+        'Área Unitária (m²)': areaUnit !== null ? areaUnit : '-',
+        'Área Total (m²)': areaTotal !== null ? areaTotal : '-',
+        'Quantidade': item.quantidade,
+        'Unidade': item.unidade,
+        'Data Cadastro': item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '',
+        'Operador': item.operador || 'Operador PCP'
+      };
+    });
     const wsGerais = XLSX.utils.json_to_sheet(geraisData);
     wsGerais['!cols'] = [
-      { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 16 }
+      { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 16 }
     ];
     XLSX.utils.book_append_sheet(workbook, wsGerais, "Chapas e Insumos");
   }
@@ -159,19 +170,30 @@ export function exportBumpersXLSX(items: BumperItem[]) {
 export function exportGeraisXLSX(items: GeralItem[]) {
   if (items.length === 0) return;
 
-  const dataToExport = items.map((item, idx) => ({
-    'Nº Item': items.length - idx,
-    'ID Tag / Barcode': item.id_nomus,
-    'Código Item': item.codigo_item,
-    'Descrição': item.descricao_item,
-    'Comprimento (mm)': item.comprimento_mm,
-    'Largura (mm)': item.largura_mm,
-    'Espessura (mm)': item.espessura_mm,
-    'Quantidade': item.quantidade,
-    'Unidade': item.unidade,
-    'Data Cadastro': item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '',
-    'Operador': item.operador || 'Operador PCP'
-  }));
+  const dataToExport = items.map((item, idx) => {
+    const areaUnit = (item.comprimento_mm && item.largura_mm)
+      ? Number(((item.comprimento_mm * item.largura_mm) / 1000000).toFixed(4))
+      : null;
+    const areaTotal = (areaUnit !== null)
+      ? Number((areaUnit * (item.quantidade || 1)).toFixed(4))
+      : null;
+
+    return {
+      'Nº Item': items.length - idx,
+      'ID Tag / Barcode': item.id_nomus,
+      'Código Item': item.codigo_item,
+      'Descrição': item.descricao_item,
+      'Comprimento (mm)': item.comprimento_mm,
+      'Largura (mm)': item.largura_mm,
+      'Espessura (mm)': item.espessura_mm,
+      'Área Unitária (m²)': areaUnit !== null ? areaUnit : '-',
+      'Área Total (m²)': areaTotal !== null ? areaTotal : '-',
+      'Quantidade': item.quantidade,
+      'Unidade': item.unidade,
+      'Data Cadastro': item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '',
+      'Operador': item.operador || 'Operador PCP'
+    };
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(dataToExport);
   worksheet['!cols'] = [
@@ -182,6 +204,8 @@ export function exportGeraisXLSX(items: GeralItem[]) {
     { wch: 16 },
     { wch: 14 },
     { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
     { wch: 12 },
     { wch: 10 },
     { wch: 20 },

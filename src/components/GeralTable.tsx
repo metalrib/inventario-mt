@@ -65,6 +65,12 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   // Totals
   const totalQty = items.reduce((acc, i) => acc + (Number(i.quantidade) || 0), 0);
+  const totalM2 = items.reduce((acc, i) => {
+    if (i.comprimento_mm && i.largura_mm) {
+      return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * (Number(i.quantidade) || 1);
+    }
+    return acc;
+  }, 0);
 
   // Batch Select Handlers
   const handleSelectAll = () => {
@@ -137,9 +143,13 @@ export const GeralTable: React.FC<GeralTableProps> = ({
               {items.length} registros
             </span>
           </h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Total Registrado: <strong className="text-slate-800">{totalQty} unidades / peças</strong>
-          </p>
+          <div className="text-xs text-slate-500 font-medium mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Total: <strong className="text-slate-800 font-extrabold">{totalQty} unidades/chapas</strong></span>
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-2.5 py-0.5 rounded-md font-bold">
+              Área Total Acumulada: <strong className="text-emerald-800 font-black">{totalM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²</strong>
+            </span>
+          </div>
         </div>
 
         {onRefresh && (
@@ -252,7 +262,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
               <th className="p-3">Código de Barras</th>
               <th className="p-3">Código Item</th>
               <th className="p-3">Descrição</th>
-              <th className="p-3 text-center">Dimensões (C x L x E)</th>
+              <th className="p-3 text-center">Dimensões & Área (m²)</th>
               <th className="p-3 text-center">Qtd / Unid.</th>
               <th className="p-3 text-center">Data / Operador</th>
               <th className="p-3 text-right">Ações</th>
@@ -388,10 +398,24 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                     <td className="p-3 text-slate-700 max-w-[200px] truncate" title={item.descricao_item}>
                       {item.descricao_item}
                     </td>
-                    <td className="p-3 text-center font-bold text-slate-800">
-                      <span className="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200">
-                        {formatDimension(item)}
-                      </span>
+                    <td className="p-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200 text-xs font-mono font-bold">
+                          {formatDimension(item)}
+                        </span>
+                        {item.comprimento_mm && item.largura_mm ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-extrabold text-[#1b367c] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 whitespace-nowrap">
+                              {((item.comprimento_mm * item.largura_mm) / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
+                            </span>
+                            {item.quantidade > 1 && (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap" title="Área Total (Quantidade x m² unitário)">
+                                Tot: {(((item.comprimento_mm * item.largura_mm) / 1000000) * item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="p-3 text-center font-extrabold text-slate-900">
                       {item.quantidade} <span className="text-[10px] text-slate-500 font-normal">{item.unidade}</span>

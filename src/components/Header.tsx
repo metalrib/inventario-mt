@@ -11,6 +11,7 @@ interface HeaderProps {
   catalogCount?: number;
   totalPerfisMeters: number;
   totalBumpersQty: number;
+  totalGeraisM2?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   catalogCount = 0,
   totalPerfisMeters,
   totalBumpersQty,
+  totalGeraisM2 = 0,
 }) => {
   return (
     <header className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 mb-3 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
@@ -51,15 +53,20 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Metrics Quick Summary */}
-      <div className="hidden lg:flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
+      <div className="hidden lg:flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase font-bold">Retalhos (Metros)</span>
+          <span className="text-slate-400 block text-[10px] uppercase font-bold">Retalhos</span>
           <span className="text-sm font-extrabold text-[#1b367c]">{totalPerfisMeters.toFixed(1)}m</span>
         </div>
         <div className="h-6 w-px bg-slate-300"></div>
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Bumpers</span>
+          <span className="text-slate-400 block text-[10px] uppercase font-bold">Bumpers</span>
           <span className="text-sm font-extrabold text-[#1b367c]">{totalBumpersQty} un</span>
+        </div>
+        <div className="h-6 w-px bg-slate-300"></div>
+        <div>
+          <span className="text-slate-400 block text-[10px] uppercase font-bold">Chapas (Área)</span>
+          <span className="text-sm font-extrabold text-emerald-700">{totalGeraisM2.toFixed(2)} m²</span>
         </div>
       </div>
 

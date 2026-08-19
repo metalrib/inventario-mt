@@ -303,7 +303,14 @@ export default function App() {
     if (item.comprimento_mm) parts.push(`${item.comprimento_mm}`);
     if (item.largura_mm) parts.push(`${item.largura_mm}`);
     if (item.espessura_mm) parts.push(`${item.espessura_mm}`);
-    return parts.length > 0 ? `${parts.join(' x ')} MM` : '';
+    if (parts.length === 0) return '';
+    
+    let baseDim = `${parts.join(' x ')} MM`;
+    if (item.comprimento_mm && item.largura_mm) {
+      const m2 = ((item.comprimento_mm * item.largura_mm) / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+      baseDim += ` (${m2} m²)`;
+    }
+    return baseDim;
   };
 
   const handlePrintSingleGeral = (item: GeralItem) => {
@@ -347,6 +354,12 @@ export default function App() {
 
   const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
   const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
+  const totalGeraisM2 = gerais.reduce((acc, g) => {
+    if (g.comprimento_mm && g.largura_mm) {
+      return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * (g.quantidade || 1);
+    }
+    return acc;
+  }, 0);
 
   const allExistingNomusIds = [
     ...perfis.map(p => p.id_nomus || ''),
@@ -367,6 +380,7 @@ export default function App() {
         catalogCount={productCatalog.length}
         totalPerfisMeters={totalPerfisMeters}
         totalBumpersQty={totalBumpersQty}
+        totalGeraisM2={totalGeraisM2}
       />
 
       {/* Backup & History Bar */}
