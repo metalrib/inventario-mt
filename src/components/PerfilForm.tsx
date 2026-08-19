@@ -10,12 +10,14 @@ interface PerfilFormProps {
     descricao_perfil: string;
     medida_mm: number;
     quantidade: number;
+    operador?: string;
   }) => Promise<void>;
   onOpenCatalog: () => void;
   selectedCatalogItem: ProfileCatalogItem | null;
   manterMedidaPerfis: boolean;
   onToggleManterMedida: (val: boolean) => void;
   existingNomusIds: string[];
+  operadorPadrao?: string;
 }
 
 export const PerfilForm: React.FC<PerfilFormProps> = ({
@@ -24,12 +26,18 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
   selectedCatalogItem,
   manterMedidaPerfis,
   onToggleManterMedida,
-  existingNomusIds = []
+  existingNomusIds = [],
+  operadorPadrao = 'Operador Produção'
 }) => {
   const [idNomus, setIdNomus] = useState('');
   const [medidaMm, setMedidaMm] = useState('');
   const [quantidade, setQuantidade] = useState(1);
+  const [operador, setOperador] = useState(operadorPadrao);
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (operadorPadrao) setOperador(operadorPadrao);
+  }, [operadorPadrao]);
 
   const generateNomusId = () => {
     const nextId = generateUniqueNomusId(existingNomusIds, idNomus);
@@ -67,7 +75,8 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
         codigo_perfil: selectedCatalogItem.code,
         descricao_perfil: selectedCatalogItem.desc,
         medida_mm: parseInt(medidaMm),
-        quantidade: quantidade
+        quantidade: quantidade,
+        operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
       // Reset form
@@ -93,32 +102,50 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ID Nomus */}
-        <div>
-          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-            ID Nomus (Manual ou Auto)
-          </label>
-          <div className="flex gap-2">
+        {/* ID Nomus & Operador */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+              ID Nomus (Manual ou Auto)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={idNomus}
+                onChange={handleIdChange}
+                placeholder="Ex: 2026.08.06.1430"
+                className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-semibold font-mono focus:outline-none focus:border-[#1b367c]"
+              />
+              <button
+                type="button"
+                onClick={generateNomusId}
+                className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-lg border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
+              >
+                <Zap size={14} className="text-sky-600 fill-sky-600" />
+                <span>Gerar ID</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-slate-500 mt-1 block">
+              Se deixar em branco, o ID será gerado com data e hora atual.
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+              Operador / Responsável
+            </label>
             <input
               type="text"
-              value={idNomus}
-              onChange={handleIdChange}
-              placeholder="Ex: 2026.08.06.1430"
-              className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-semibold font-mono focus:outline-none focus:border-[#1b367c]"
+              value={operador}
+              onChange={e => setOperador(e.target.value)}
+              placeholder="Nome do Operador"
+              className="w-full h-11 px-3 border-2 border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white"
             />
-            <button
-              type="button"
-              onClick={generateNomusId}
-              className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-lg border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap"
-              title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
-            >
-              <Zap size={14} className="text-sky-600 fill-sky-600" />
-              <span>Gerar ID</span>
-            </button>
+            <span className="text-[11px] text-slate-500 mt-1 block">
+              Nome de quem está lançando.
+            </span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">
-            Se deixar em branco, o ID será gerado automaticamente com a data e hora atual.
-          </span>
         </div>
 
         {/* Catalog Selector Button */}

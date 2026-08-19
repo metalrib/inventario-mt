@@ -34,9 +34,16 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const [espessuraMm, setEspessuraMm] = useState<string>('');
   const [quantidade, setQuantidade] = useState<number>(1);
   const [unidade, setUnidade] = useState<string>('peças');
+  const [operador, setOperador] = useState<string>(operadorPadrao || 'Operador Produção');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveToCatalogCheck, setSaveToCatalogCheck] = useState(true);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (operadorPadrao) {
+      setOperador(operadorPadrao);
+    }
+  }, [operadorPadrao]);
 
   // Suggestions Dropdown
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -174,7 +181,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         espessura_mm: Number(espessuraMm) || 0,
         quantidade: finalQuantidade,
         unidade,
-        operador: operadorPadrao
+        operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
       if (autoImprimirAoSalvar && onOpenPrintModal && newItem) {
@@ -232,32 +239,50 @@ export const GeralForm: React.FC<GeralFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ID Nomus (Manual ou Auto) */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-            ID Nomus / Barcode (Manual ou Auto)
-          </label>
-          <div className="flex gap-2">
+        {/* ID Nomus & Operador */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              ID Nomus / Barcode (Manual ou Auto)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={idNomus}
+                onChange={handleIdChange}
+                placeholder="Ex: 2026.08.06.1430 ou digite um ID próprio"
+                className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
+              />
+              <button
+                type="button"
+                onClick={handleGenerateId}
+                className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-xl border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-sm cursor-pointer"
+                title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
+              >
+                <Zap size={14} className="text-sky-600 fill-sky-600" />
+                <span>Gerar ID Auto</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-slate-500 mt-1 block font-medium">
+              Se deixar em branco, a etiqueta exibirá Cód, Descrição e QR Code.
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Operador / Responsável
+            </label>
             <input
               type="text"
-              value={idNomus}
-              onChange={handleIdChange}
-              placeholder="Ex: 2026.08.06.1430 ou digite um ID próprio"
-              className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
+              value={operador}
+              onChange={e => setOperador(e.target.value)}
+              placeholder="Nome de quem está fazendo"
+              className="w-full h-11 px-3 border-2 border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
             />
-            <button
-              type="button"
-              onClick={handleGenerateId}
-              className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-xl border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-sm cursor-pointer"
-              title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
-            >
-              <Zap size={14} className="text-sky-600 fill-sky-600" />
-              <span>Gerar ID Auto</span>
-            </button>
+            <span className="text-[11px] text-slate-500 mt-1 block font-medium">
+              Nome gravado no inventário.
+            </span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-            Se deixar em branco, o item não terá ID (a etiqueta exibirá apenas Cód, Descrição, QR Code e Medida).
-          </span>
         </div>
 
         {/* Auto-filled notification badge */}

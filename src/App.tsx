@@ -131,11 +131,12 @@ export default function App() {
     descricao_perfil: string;
     medida_mm: number;
     quantidade: number;
+    operador?: string;
   }) => {
     const saved = await insertPerfil({
       ...data,
       status: 'Com ID Nomus',
-      operador: config.operadorPadrao
+      operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
     setPerfis(prev => [saved, ...prev]);
 
@@ -165,10 +166,11 @@ export default function App() {
     codigo: string;
     medida_mm: number;
     quantidade: number;
+    operador?: string;
   }) => {
     const saved = await insertBumper({
       ...data,
-      operador: config.operadorPadrao
+      operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
     setBumpers(prev => [saved, ...prev]);
 
@@ -345,6 +347,15 @@ export default function App() {
     window.print();
   };
 
+  const handleUpdateOperador = (newOperador: string) => {
+    const updated: AppConfig = {
+      ...config,
+      operadorPadrao: newOperador.trim() || 'Operador Produção'
+    };
+    setConfig(updated);
+    saveAppConfig(updated);
+  };
+
   const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
   const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
   const totalGeraisM2 = gerais.reduce((acc, g) => {
@@ -384,6 +395,8 @@ export default function App() {
         totalPerfisMeters={totalPerfisMeters}
         totalBumpersQty={totalBumpersQty}
         totalGeraisM2={totalGeraisM2}
+        operador={config.operadorPadrao}
+        onChangeOperador={handleUpdateOperador}
       />
 
       {/* Backup & History Bar */}
@@ -420,6 +433,7 @@ export default function App() {
                   saveAppConfig(newCfg);
                 }}
                 existingNomusIds={allExistingNomusIds}
+                operadorPadrao={config.operadorPadrao}
               />
             </div>
 
@@ -453,6 +467,7 @@ export default function App() {
                   saveAppConfig(newCfg);
                 }}
                 existingNomusIds={allExistingNomusIds}
+                operadorPadrao={config.operadorPadrao}
               />
             </div>
 

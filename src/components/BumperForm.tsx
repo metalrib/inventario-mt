@@ -10,23 +10,31 @@ interface BumperFormProps {
     id_nomus?: string;
     medida_mm: number;
     quantidade: number;
+    operador?: string;
   }) => Promise<void>;
   manterMedidaBumpers: boolean;
   onToggleManterMedida: (val: boolean) => void;
   existingNomusIds?: string[];
+  operadorPadrao?: string;
 }
 
 export const BumperForm: React.FC<BumperFormProps> = ({
   onSaveBumper,
   manterMedidaBumpers,
   onToggleManterMedida,
-  existingNomusIds = []
+  existingNomusIds = [],
+  operadorPadrao = 'Operador Produção'
 }) => {
   const [bumperType, setBumperType] = useState<BumperType>('ID');
   const [codigo, setCodigo] = useState('');
   const [medidaMm, setMedidaMm] = useState('');
   const [quantidade, setQuantidade] = useState(1);
+  const [operador, setOperador] = useState(operadorPadrao);
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (operadorPadrao) setOperador(operadorPadrao);
+  }, [operadorPadrao]);
 
   const generateNomusId = () => {
     const nextId = generateUniqueNomusId(existingNomusIds, codigo);
@@ -85,7 +93,8 @@ export const BumperForm: React.FC<BumperFormProps> = ({
         codigo: codigo.trim(),
         id_nomus: bumperType === 'ID' ? codigo.trim() : undefined,
         medida_mm: parseInt(medidaMm),
-        quantidade: quantidade
+        quantidade: quantidade,
+        operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
       setCodigo('');
@@ -225,6 +234,20 @@ export const BumperForm: React.FC<BumperFormProps> = ({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Operador / Responsável */}
+        <div>
+          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+            Operador / Responsável
+          </label>
+          <input
+            type="text"
+            value={operador}
+            onChange={e => setOperador(e.target.value)}
+            placeholder="Nome de quem está fazendo o inventário"
+            className="w-full h-11 px-3 border-2 border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white"
+          />
         </div>
 
         {/* Keep measure toggle */}

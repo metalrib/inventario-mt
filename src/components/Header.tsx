@@ -1,5 +1,5 @@
-import React from 'react';
-import { Wifi, WifiOff, Settings, Camera, RefreshCw, BookOpen, Package } from 'lucide-react';
+import React, { useState } from 'react';
+import { Wifi, WifiOff, Settings, Camera, RefreshCw, BookOpen, User, Edit3, Check, X } from 'lucide-react';
 
 interface HeaderProps {
   isOnline: boolean;
@@ -12,6 +12,8 @@ interface HeaderProps {
   totalPerfisMeters: number;
   totalBumpersQty: number;
   totalGeraisM2?: number;
+  operador?: string;
+  onChangeOperador?: (newOperador: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,7 +27,20 @@ export const Header: React.FC<HeaderProps> = ({
   totalPerfisMeters,
   totalBumpersQty,
   totalGeraisM2 = 0,
+  operador = 'Operador Produção',
+  onChangeOperador,
 }) => {
+  const [isEditingOperador, setIsEditingOperador] = useState(false);
+  const [tempOperador, setTempOperador] = useState(operador);
+
+  const handleSaveOperador = () => {
+    const trimmed = tempOperador.trim();
+    if (trimmed && onChangeOperador) {
+      onChangeOperador(trimmed);
+    }
+    setIsEditingOperador(false);
+  };
+
   return (
     <header className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 mb-3 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
       {/* Brand & Logo */}
@@ -41,32 +56,97 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div>
           <h1 className="text-lg font-extrabold text-[#1b367c] leading-tight flex items-center gap-2">
-            Coleta PCP
+            Inventário Produção
             <span className="text-xs font-semibold px-2 py-0.5 bg-blue-50 text-[#1b367c] border border-blue-200 rounded-full">
               v2.5 Pro
             </span>
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Controle Inteligente de Estoque, Chapas, Insumos & Retalhos
+            Controle de Estoque de Chapas, Insumos, Perfis & Bumpers
           </p>
         </div>
       </div>
 
-      {/* Metrics Quick Summary */}
-      <div className="hidden lg:flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
-        <div>
-          <span className="text-slate-400 block text-[10px] uppercase font-bold">Retalhos</span>
-          <span className="text-sm font-extrabold text-[#1b367c]">{totalPerfisMeters.toFixed(1)}m</span>
+      {/* Metrics Quick Summary & Operador */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Operador / Responsável pelo Inventário */}
+        <div className="flex items-center gap-2 bg-amber-50/80 border border-amber-200/90 rounded-lg px-3 py-1.5 text-xs shadow-2xs">
+          <div className="p-1 bg-amber-100 text-amber-800 rounded-md">
+            <User size={15} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] uppercase font-extrabold text-amber-800 tracking-wider leading-none">
+              Operador Atual
+            </span>
+            {isEditingOperador ? (
+              <div className="flex items-center gap-1 mt-1">
+                <input
+                  type="text"
+                  value={tempOperador}
+                  onChange={e => setTempOperador(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveOperador();
+                    if (e.key === 'Escape') setIsEditingOperador(false);
+                  }}
+                  autoFocus
+                  placeholder="Nome do Operador"
+                  className="h-6 px-2 text-xs font-bold bg-white border-2 border-amber-400 rounded-md focus:outline-none w-32 sm:w-44 text-slate-800"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveOperador}
+                  className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                  title="Salvar Nome"
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingOperador(false)}
+                  className="p-1 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded cursor-pointer"
+                  title="Cancelar"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setTempOperador(operador || 'Operador Produção');
+                  setIsEditingOperador(true);
+                }}
+                className="text-xs font-black text-amber-950 hover:text-[#1b367c] flex items-center gap-1.5 text-left leading-tight cursor-pointer group mt-0.5"
+                title="Clique aqui para alterar o nome do operador do inventário"
+              >
+                <span className="truncate max-w-[120px] sm:max-w-[170px]">
+                  {operador || 'Operador Produção'}
+                </span>
+                <span className="text-[10px] text-amber-700 bg-amber-200/70 hover:bg-amber-300 font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors">
+                  <Edit3 size={10} />
+                  Trocar
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-        <div className="h-6 w-px bg-slate-300"></div>
-        <div>
-          <span className="text-slate-400 block text-[10px] uppercase font-bold">Bumpers</span>
-          <span className="text-sm font-extrabold text-[#1b367c]">{totalBumpersQty} un</span>
-        </div>
-        <div className="h-6 w-px bg-slate-300"></div>
-        <div>
-          <span className="text-slate-400 block text-[10px] uppercase font-bold">Chapas (Área)</span>
-          <span className="text-sm font-extrabold text-emerald-700">{totalGeraisM2.toFixed(2)} m²</span>
+
+        {/* Metrics Quick Summary */}
+        <div className="hidden lg:flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Retalhos</span>
+            <span className="text-sm font-extrabold text-[#1b367c]">{totalPerfisMeters.toFixed(1)}m</span>
+          </div>
+          <div className="h-6 w-px bg-slate-300"></div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Bumpers</span>
+            <span className="text-sm font-extrabold text-[#1b367c]">{totalBumpersQty} un</span>
+          </div>
+          <div className="h-6 w-px bg-slate-300"></div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Chapas (Área)</span>
+            <span className="text-sm font-extrabold text-emerald-700">{totalGeraisM2.toFixed(2)} m²</span>
+          </div>
         </div>
       </div>
 
