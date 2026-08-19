@@ -108,50 +108,46 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ID Nomus & Operador */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+        {/* ID Nomus */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
               ID Nomus (Manual ou Auto)
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={idNomus}
-                onChange={handleIdChange}
-                placeholder="Ex: 2026.08.06.1430"
-                className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-semibold font-mono focus:outline-none focus:border-[#1b367c]"
-              />
-              <button
-                type="button"
-                onClick={generateNomusId}
-                className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-lg border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap"
-                title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
-              >
-                <Zap size={14} className="text-sky-600 fill-sky-600" />
-                <span>Gerar ID</span>
-              </button>
-            </div>
-            <span className="text-[11px] text-slate-500 mt-1 block">
-              Se deixar em branco, o ID será gerado com data e hora atual.
-            </span>
+            <button
+              type="button"
+              onClick={generateNomusId}
+              className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-2.5 py-1 rounded-lg border border-sky-200 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
+            >
+              <Zap size={13} className="text-sky-600 fill-sky-600" />
+              <span>Gerar ID</span>
+            </button>
           </div>
+          <input
+            type="text"
+            value={idNomus}
+            onChange={handleIdChange}
+            placeholder="Ex: 2026.08.19.1430"
+            className="w-full h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-semibold font-mono focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
+          />
+          <span className="text-[11px] text-slate-500 mt-1 block">
+            Se deixar em branco, o ID será gerado com data e hora atual.
+          </span>
+        </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-              Operador / Responsável
-            </label>
-            <input
-              type="text"
-              value={operador}
-              onChange={e => setOperador(e.target.value)}
-              placeholder="Nome do Operador"
-              className="w-full h-11 px-3 border-2 border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white"
-            />
-            <span className="text-[11px] text-slate-500 mt-1 block">
-              Nome de quem está lançando.
-            </span>
-          </div>
+        {/* Operador / Responsável */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Operador / Responsável
+          </label>
+          <input
+            type="text"
+            value={operador}
+            onChange={e => setOperador(e.target.value)}
+            placeholder="Nome de quem está lançando"
+            className="w-full h-11 px-3 border-2 border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
+          />
         </div>
 
         {/* Catalog Selector Button */}
