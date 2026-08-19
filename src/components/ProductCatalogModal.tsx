@@ -335,11 +335,14 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
                   onChange={e => setFormUnidade(e.target.value)}
                   className="w-full h-8 px-2 bg-white border border-slate-300 rounded-lg text-xs font-medium"
                 >
+                  <option value="metros quadrados">metros quadrados (m²)</option>
+                  <option value="m²">m²</option>
                   <option value="chapas">chapas</option>
                   <option value="peças">peças</option>
-                  <option value="metros">metros</option>
+                  <option value="metros">metros (lineares)</option>
                   <option value="barras">barras</option>
                   <option value="kg">kg</option>
+                  <option value="rolo">rolo / bobina</option>
                   <option value="un">un</option>
                 </select>
               </div>

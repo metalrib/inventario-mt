@@ -359,8 +359,9 @@ export default function App() {
   const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
   const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
   const totalGeraisM2 = gerais.reduce((acc, g) => {
+    const isM2 = g.unidade === 'm²' || g.unidade === 'metros quadrados' || g.unidade === 'm2';
     if (g.comprimento_mm && g.largura_mm) {
-      if (g.unidade === 'm²') {
+      if (isM2) {
         const val = Number(g.quantidade) || 0;
         if (val >= 1 && Number.isInteger(val)) {
           return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * val;
@@ -369,7 +370,7 @@ export default function App() {
       }
       return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * (g.quantidade || 1);
     }
-    if (g.unidade === 'm²') {
+    if (isM2) {
       return acc + (Number(g.quantidade) || 0);
     }
     return acc;

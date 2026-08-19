@@ -167,7 +167,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
       let finalQuantidade = Math.max(1, quantidade);
       const compNum = Number(comprimentoMm) || 0;
       const largNum = Number(larguraMm) || 0;
-      if (unidade === 'm²' && compNum > 0 && largNum > 0) {
+      const isM2Unit = unidade === 'm²' || unidade === 'metros quadrados' || unidade === 'm2';
+      if (isM2Unit && compNum > 0 && largNum > 0) {
         finalQuantidade = Number((((compNum * largNum) / 1000000) * quantidade).toFixed(4));
       }
 
@@ -388,7 +389,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           {/* Quantidade */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              {unidade === 'm²' ? 'Quantidade (Nº de Chapas/Peças) *' : 'Quantidade *'}
+              {(unidade === 'm²' || unidade === 'metros quadrados' || unidade === 'm2') ? 'Quantidade (Nº de Chapas/Peças) *' : 'Quantidade *'}
             </label>
             <input
               type="number"
@@ -398,7 +399,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
               className="w-full h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-black text-center focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
               required
             />
-            {unidade === 'm²' && (
+            {(unidade === 'm²' || unidade === 'metros quadrados' || unidade === 'm2') && (
               <span className="text-[10px] text-sky-800 font-semibold mt-1 block">
                 {Number(comprimentoMm) > 0 && Number(larguraMm) > 0
                   ? `Será lançado: ${(((Number(comprimentoMm) * Number(larguraMm)) / 1000000) * quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m² no estoque`
@@ -417,11 +418,12 @@ export const GeralForm: React.FC<GeralFormProps> = ({
               onChange={e => setUnidade(e.target.value)}
               className="w-full h-11 px-3 border-2 border-slate-300 rounded-xl text-xs font-extrabold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
             >
+              <option value="metros quadrados">Metros Quadrados (m²)</option>
+              <option value="m²">m²</option>
               <option value="chapas">Chapas</option>
               <option value="peças">Peças (un)</option>
               <option value="metros">Metros Lineares (m)</option>
               <option value="barras">Barras</option>
-              <option value="m²">m² (Metro Quadrado)</option>
               <option value="kg">kg (Quilos)</option>
               <option value="rolo">Rolo / Bobina</option>
             </select>

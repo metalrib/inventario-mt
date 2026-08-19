@@ -65,8 +65,9 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   // Totals
   const totalM2 = items.reduce((acc, i) => {
+    const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
     if (i.comprimento_mm && i.largura_mm) {
-      if (i.unidade === 'm²') {
+      if (isM2) {
         const val = Number(i.quantidade) || 0;
         if (val >= 1 && Number.isInteger(val)) {
           return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * val;
@@ -75,14 +76,15 @@ export const GeralTable: React.FC<GeralTableProps> = ({
       }
       return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * (Number(i.quantidade) || 1);
     }
-    if (i.unidade === 'm²') {
+    if (isM2) {
       return acc + (Number(i.quantidade) || 0);
     }
     return acc;
   }, 0);
 
   const totalQty = items.reduce((acc, i) => {
-    if (i.unidade === 'm²') {
+    const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
+    if (isM2) {
       const val = Number(i.quantidade) || 0;
       if (val >= 1 && Number.isInteger(val)) return acc + val;
       return acc + 1;
