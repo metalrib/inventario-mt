@@ -105,9 +105,19 @@ export function exportAllToXLSX(perfis: PerfilItem[], bumpers: BumperItem[], ger
       const areaUnit = (item.comprimento_mm && item.largura_mm)
         ? Number(((item.comprimento_mm * item.largura_mm) / 1000000).toFixed(4))
         : null;
-      const areaTotal = (areaUnit !== null)
-        ? Number((areaUnit * (item.quantidade || 1)).toFixed(4))
-        : null;
+      let areaTotal: number | null = null;
+      if (areaUnit !== null) {
+        if (item.unidade === 'm²') {
+          const val = Number(item.quantidade) || 0;
+          if (val >= 1 && Number.isInteger(val)) {
+            areaTotal = Number((areaUnit * val).toFixed(4));
+          } else {
+            areaTotal = val > 0 ? val : areaUnit;
+          }
+        } else {
+          areaTotal = Number((areaUnit * (item.quantidade || 1)).toFixed(4));
+        }
+      }
 
       return {
         'Nº Item': gerais.length - idx,
@@ -174,9 +184,19 @@ export function exportGeraisXLSX(items: GeralItem[]) {
     const areaUnit = (item.comprimento_mm && item.largura_mm)
       ? Number(((item.comprimento_mm * item.largura_mm) / 1000000).toFixed(4))
       : null;
-    const areaTotal = (areaUnit !== null)
-      ? Number((areaUnit * (item.quantidade || 1)).toFixed(4))
-      : null;
+    let areaTotal: number | null = null;
+    if (areaUnit !== null) {
+      if (item.unidade === 'm²') {
+        const val = Number(item.quantidade) || 0;
+        if (val >= 1 && Number.isInteger(val)) {
+          areaTotal = Number((areaUnit * val).toFixed(4));
+        } else {
+          areaTotal = val > 0 ? val : areaUnit;
+        }
+      } else {
+        areaTotal = Number((areaUnit * (item.quantidade || 1)).toFixed(4));
+      }
+    }
 
     return {
       'Nº Item': items.length - idx,

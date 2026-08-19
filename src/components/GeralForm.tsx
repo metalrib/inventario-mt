@@ -157,15 +157,22 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         }
       }
 
+      let finalQuantidade = Math.max(1, quantidade);
+      const compNum = Number(comprimentoMm) || 0;
+      const largNum = Number(larguraMm) || 0;
+      if (unidade === 'm²' && compNum > 0 && largNum > 0) {
+        finalQuantidade = Number((((compNum * largNum) / 1000000) * quantidade).toFixed(4));
+      }
+
       // 2. Add Item to Inventory
       const newItem = await onAddItem({
         id_nomus: finalIdNomus,
         codigo_item: finalCodigo,
         descricao_item: finalDescricao,
-        comprimento_mm: Number(comprimentoMm) || 0,
-        largura_mm: Number(larguraMm) || 0,
+        comprimento_mm: compNum,
+        largura_mm: largNum,
         espessura_mm: Number(espessuraMm) || 0,
-        quantidade: Math.max(1, quantidade),
+        quantidade: finalQuantidade,
         unidade,
         operador: operadorPadrao
       });
@@ -356,7 +363,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           {/* Quantidade */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Quantidade *
+              {unidade === 'm²' ? 'Quantidade (Nº de Chapas/Peças) *' : 'Quantidade *'}
             </label>
             <input
               type="number"
@@ -366,6 +373,13 @@ export const GeralForm: React.FC<GeralFormProps> = ({
               className="w-full h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-black text-center focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
               required
             />
+            {unidade === 'm²' && (
+              <span className="text-[10px] text-sky-800 font-semibold mt-1 block">
+                {Number(comprimentoMm) > 0 && Number(larguraMm) > 0
+                  ? `Será lançado: ${(((Number(comprimentoMm) * Number(larguraMm)) / 1000000) * quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m² no estoque`
+                  : 'Preencha o comprimento e largura para calcular a área em m²'}
+              </span>
+            )}
           </div>
 
           {/* Unidade */}

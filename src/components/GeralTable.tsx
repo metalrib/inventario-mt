@@ -64,12 +64,30 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   });
 
   // Totals
-  const totalQty = items.reduce((acc, i) => acc + (Number(i.quantidade) || 0), 0);
   const totalM2 = items.reduce((acc, i) => {
     if (i.comprimento_mm && i.largura_mm) {
+      if (i.unidade === 'm²') {
+        const val = Number(i.quantidade) || 0;
+        if (val >= 1 && Number.isInteger(val)) {
+          return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * val;
+        }
+        return acc + (val > 0 ? val : ((i.comprimento_mm * i.largura_mm) / 1000000));
+      }
       return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * (Number(i.quantidade) || 1);
     }
+    if (i.unidade === 'm²') {
+      return acc + (Number(i.quantidade) || 0);
+    }
     return acc;
+  }, 0);
+
+  const totalQty = items.reduce((acc, i) => {
+    if (i.unidade === 'm²') {
+      const val = Number(i.quantidade) || 0;
+      if (val >= 1 && Number.isInteger(val)) return acc + val;
+      return acc + 1;
+    }
+    return acc + (Number(i.quantidade) || 0);
   }, 0);
 
   // Batch Select Handlers
@@ -418,7 +436,28 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       </div>
                     </td>
                     <td className="p-3 text-center font-extrabold text-slate-900">
-                      {item.quantidade} <span className="text-[10px] text-slate-500 font-normal">{item.unidade}</span>
+                      {item.unidade === 'm²' ? (
+                        <div className="flex flex-col items-center">
+                          <span className="font-mono font-black text-[#1b367c] text-xs">
+                            {(() => {
+                              let val = Number(item.quantidade) || 0;
+                              if (item.comprimento_mm && item.largura_mm && (val >= 1 && Number.isInteger(val))) {
+                                val = ((item.comprimento_mm * item.largura_mm) / 1000000) * val;
+                              }
+                              return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+                            })()} <span className="text-[10px] text-slate-500 font-semibold">m²</span>
+                          </span>
+                          {item.comprimento_mm && item.largura_mm && Number(item.quantidade) >= 1 && Number.isInteger(Number(item.quantidade)) && (
+                            <span className="text-[9px] text-slate-400 font-normal">
+                              ({item.quantidade} {item.quantidade === 1 ? 'chapa' : 'chapas'})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span>
+                          {item.quantidade} <span className="text-[10px] text-slate-500 font-normal">{item.unidade}</span>
+                        </span>
+                      )}
                     </td>
                     <td className="p-3 text-center text-[10px] text-slate-500">
                       <div>{item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : ''}</div>

@@ -303,14 +303,7 @@ export default function App() {
     if (item.comprimento_mm) parts.push(`${item.comprimento_mm}`);
     if (item.largura_mm) parts.push(`${item.largura_mm}`);
     if (item.espessura_mm) parts.push(`${item.espessura_mm}`);
-    if (parts.length === 0) return '';
-    
-    let baseDim = `${parts.join(' x ')} MM`;
-    if (item.comprimento_mm && item.largura_mm) {
-      const m2 = ((item.comprimento_mm * item.largura_mm) / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-      baseDim += ` (${m2} m²)`;
-    }
-    return baseDim;
+    return parts.length > 0 ? `${parts.join(' x ')} MM` : '';
   };
 
   const handlePrintSingleGeral = (item: GeralItem) => {
@@ -356,7 +349,17 @@ export default function App() {
   const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
   const totalGeraisM2 = gerais.reduce((acc, g) => {
     if (g.comprimento_mm && g.largura_mm) {
+      if (g.unidade === 'm²') {
+        const val = Number(g.quantidade) || 0;
+        if (val >= 1 && Number.isInteger(val)) {
+          return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * val;
+        }
+        return acc + (val > 0 ? val : ((g.comprimento_mm * g.largura_mm) / 1000000));
+      }
       return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * (g.quantidade || 1);
+    }
+    if (g.unidade === 'm²') {
+      return acc + (Number(g.quantidade) || 0);
     }
     return acc;
   }, 0);
