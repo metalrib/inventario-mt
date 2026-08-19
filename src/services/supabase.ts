@@ -28,7 +28,9 @@ export function getAppConfig(): AppConfig {
     operadorPadrao: 'Operador PCP',
     autoImprimirAoSalvar: false,
     manterMedidaBumpers: true,
-    manterMedidaPerfis: false
+    manterMedidaPerfis: false,
+    autoGerarIdNomus: true,
+    fixarProdutoGeral: true
   };
 }
 

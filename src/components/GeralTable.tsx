@@ -389,6 +389,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                   );
                 }
 
+                const isM2 = item.unidade === 'm²' || item.unidade === 'metros quadrados' || item.unidade === 'm2';
+
                 return (
                   <tr
                     key={item.id}
@@ -428,9 +430,10 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                             <span className="text-[11px] font-extrabold text-[#1b367c] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 whitespace-nowrap">
                               {((item.comprimento_mm * item.largura_mm) / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
                             </span>
-                            {item.quantidade > 1 && (
+                            {/* Only show "Tot:" multiplier if the item is registered in pieces/units with integer count > 1 */}
+                            {!isM2 && Number.isInteger(Number(item.quantidade)) && Number(item.quantidade) > 1 && (
                               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap" title="Área Total (Quantidade x m² unitário)">
-                                Tot: {(((item.comprimento_mm * item.largura_mm) / 1000000) * item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
+                                Tot: {(((item.comprimento_mm * item.largura_mm) / 1000000) * Number(item.quantidade)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
                               </span>
                             )}
                           </div>
@@ -438,22 +441,11 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       </div>
                     </td>
                     <td className="p-3 text-center font-extrabold text-slate-900">
-                      {item.unidade === 'm²' ? (
+                      {isM2 ? (
                         <div className="flex flex-col items-center">
                           <span className="font-mono font-black text-[#1b367c] text-xs">
-                            {(() => {
-                              let val = Number(item.quantidade) || 0;
-                              if (item.comprimento_mm && item.largura_mm && (val >= 1 && Number.isInteger(val))) {
-                                val = ((item.comprimento_mm * item.largura_mm) / 1000000) * val;
-                              }
-                              return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-                            })()} <span className="text-[10px] text-slate-500 font-semibold">m²</span>
+                            {Number(item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} <span className="text-[10px] text-slate-500 font-semibold">m²</span>
                           </span>
-                          {item.comprimento_mm && item.largura_mm && Number(item.quantidade) >= 1 && Number.isInteger(Number(item.quantidade)) && (
-                            <span className="text-[9px] text-slate-400 font-normal">
-                              ({item.quantidade} {item.quantidade === 1 ? 'chapa' : 'chapas'})
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <span>

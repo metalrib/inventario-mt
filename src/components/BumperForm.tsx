@@ -33,6 +33,12 @@ export const BumperForm: React.FC<BumperFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
+    if (bumperType === 'ID' && !codigo) {
+      setCodigo(generateUniqueNomusId(existingNomusIds));
+    }
+  }, [bumperType, existingNomusIds]);
+
+  React.useEffect(() => {
     if (operadorPadrao) setOperador(operadorPadrao);
   }, [operadorPadrao]);
 
@@ -43,7 +49,11 @@ export const BumperForm: React.FC<BumperFormProps> = ({
 
   const handleTypeChange = (type: BumperType) => {
     setBumperType(type);
-    setCodigo('');
+    if (type === 'ID') {
+      setCodigo(generateUniqueNomusId(existingNomusIds));
+    } else {
+      setCodigo('');
+    }
   };
 
   const handleCodigoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,7 +107,11 @@ export const BumperForm: React.FC<BumperFormProps> = ({
         operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
-      setCodigo('');
+      if (bumperType === 'ID') {
+        setCodigo(generateUniqueNomusId(existingNomusIds));
+      } else {
+        setCodigo('');
+      }
       if (!manterMedidaBumpers) {
         setMedidaMm('');
       }

@@ -65,6 +65,8 @@ export interface AppConfig {
   autoImprimirAoSalvar: boolean;
   manterMedidaBumpers: boolean;
   manterMedidaPerfis: boolean;
+  autoGerarIdNomus?: boolean;
+  fixarProdutoGeral?: boolean;
 }
 
 export interface FilterState {

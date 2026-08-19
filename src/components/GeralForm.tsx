@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2 } from 'lucide-react';
+import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
 import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/supabase';
 
@@ -33,11 +33,44 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const [larguraMm, setLarguraMm] = useState<string>('');
   const [espessuraMm, setEspessuraMm] = useState<string>('');
   const [quantidade, setQuantidade] = useState<number>(1);
-  const [unidade, setUnidade] = useState<string>('peças');
+  const [unidade, setUnidade] = useState<string>('metros quadrados');
   const [operador, setOperador] = useState<string>(operadorPadrao || 'Operador Produção');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveToCatalogCheck, setSaveToCatalogCheck] = useState(true);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
+
+  // Fast-counting workflow automation states
+  const [autoGerarId, setAutoGerarId] = useState<boolean>(() => {
+    const saved = localStorage.getItem('metalrib_auto_gerar_id');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [fixarProduto, setFixarProduto] = useState<boolean>(() => {
+    const saved = localStorage.getItem('metalrib_fixar_produto');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const comprimentoInputRef = useRef<HTMLInputElement>(null);
+  const codigoInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-generate ID on mount if active and empty
+  useEffect(() => {
+    if (autoGerarId && !idNomus) {
+      setIdNomus(generateUniqueNomusId(existingNomusIds));
+    }
+  }, [autoGerarId, existingNomusIds]);
+
+  const handleToggleAutoGerarId = (val: boolean) => {
+    setAutoGerarId(val);
+    localStorage.setItem('metalrib_auto_gerar_id', String(val));
+    if (val && !idNomus) {
+      setIdNomus(generateUniqueNomusId(existingNomusIds));
+    }
+  };
+
+  const handleToggleFixarProduto = (val: boolean) => {
+    setFixarProduto(val);
+    localStorage.setItem('metalrib_fixar_produto', String(val));
+  };
 
   useEffect(() => {
     if (operadorPadrao) {
@@ -84,6 +117,23 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     }
     setAutoFilledBadge(`${item.codigo} - ${item.descricao}`);
     setShowSuggestions(false);
+
+    // Focus on Comprimento after selecting product
+    setTimeout(() => {
+      comprimentoInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleClearProductSelection = () => {
+    setCodigoItem('');
+    setDescricaoItem('');
+    setAutoFilledBadge(null);
+    setComprimentoMm('');
+    setLarguraMm('');
+    setEspessuraMm('');
+    setTimeout(() => {
+      codigoInputRef.current?.focus();
+    }, 100);
   };
 
   const handleCodigoChange = (val: string) => {
@@ -138,10 +188,11 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     e.preventDefault();
     if (!codigoItem.trim()) {
       alert("Por favor, preencha o Código do Item (ex: 023.0105).");
+      codigoInputRef.current?.focus();
       return;
     }
 
-    const finalIdNomus = idNomus.trim();
+    const finalIdNomus = idNomus.trim() || generateUniqueNomusId(existingNomusIds);
     const finalCodigo = codigoItem.trim().toUpperCase();
     const finalDescricao = descricaoItem.trim() || finalCodigo;
 
@@ -189,15 +240,39 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         onOpenPrintModal(newItem);
       }
 
-      // Reset form fields
-      setCodigoItem('');
-      setDescricaoItem('');
-      setIdNomus('');
-      setComprimentoMm('');
-      setLarguraMm('');
-      setEspessuraMm('');
-      setQuantidade(1);
-      setAutoFilledBadge(null);
+      // 3. Smart Reset according to workflow options:
+      if (fixarProduto) {
+        // KEEP product code, description, and unit. Clear only dimensions.
+        setComprimentoMm('');
+        setLarguraMm('');
+        setEspessuraMm('');
+        setQuantidade(1);
+
+        // Auto-focus on Comprimento to measure next piece immediately
+        setTimeout(() => {
+          comprimentoInputRef.current?.focus();
+        }, 120);
+      } else {
+        // Full reset
+        setCodigoItem('');
+        setDescricaoItem('');
+        setComprimentoMm('');
+        setLarguraMm('');
+        setEspessuraMm('');
+        setQuantidade(1);
+        setAutoFilledBadge(null);
+
+        setTimeout(() => {
+          codigoInputRef.current?.focus();
+        }, 120);
+      }
+
+      // If auto-generate ID is active, generate next ID automatically!
+      if (autoGerarId) {
+        setIdNomus(generateUniqueNomusId(existingNomusIds));
+      } else {
+        setIdNomus('');
+      }
     } catch (err) {
       console.error("Erro ao salvar insumo/chapa:", err);
     } finally {
@@ -226,46 +301,96 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           </div>
         </div>
 
-        {onOpenCatalog && (
+        <div className="flex items-center gap-2">
+          {onOpenCatalog && (
+            <button
+              type="button"
+              onClick={onOpenCatalog}
+              className="bg-slate-100 hover:bg-slate-200 text-[#1b367c] text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Abrir e gerenciar base de dados do catálogo de produtos"
+            >
+              <BookOpen size={15} />
+              <span>Consultar Catálogo</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Fast Inventory Acceleration Toolbar */}
+      <div className="mb-4 bg-gradient-to-r from-blue-50/80 via-slate-50 to-emerald-50/70 p-2.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+        <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+          <Zap size={14} className="text-amber-500 fill-amber-500" />
+          <span>Modo Contagem Rápida:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Toggle: Auto-Gerar ID */}
           <button
             type="button"
-            onClick={onOpenCatalog}
-            className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-[#1b367c] text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Abrir e gerenciar base de dados do catálogo de produtos"
+            onClick={() => handleToggleAutoGerarId(!autoGerarId)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+              autoGerarId
+                ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+            }`}
+            title="Gera o ID automaticamente a cada cadastro sem precisar clicar em 'Gerar ID'"
           >
-            <BookOpen size={15} />
-            <span>Consultar Catálogo</span>
+            <Zap size={13} className={autoGerarId ? 'fill-white' : 'text-slate-400'} />
+            <span>Auto-Gerar ID: {autoGerarId ? 'LIGADO' : 'DESLIGADO'}</span>
           </button>
-        )}
+
+          {/* Toggle: Fixar Produto */}
+          <button
+            type="button"
+            onClick={() => handleToggleFixarProduto(!fixarProduto)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+              fixarProduto
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+            }`}
+            title="Mantém o produto selecionado para cadastrar várias chapas do mesmo código seguidas"
+          >
+            <Pin size={13} className={fixarProduto ? 'rotate-45' : 'text-slate-400'} />
+            <span>Fixar Produto: {fixarProduto ? 'LIGADO' : 'DESLIGADO'}</span>
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ID Nomus & Operador */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              ID Nomus / Barcode (Manual ou Auto)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                ID Nomus / Barcode
+              </label>
+              {autoGerarId && (
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.2 rounded-full border border-blue-200 flex items-center gap-1">
+                  <Zap size={10} className="fill-blue-600" />
+                  Gerado Automaticamente
+                </span>
+              )}
+            </div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={idNomus}
                 onChange={handleIdChange}
-                placeholder="Ex: 2026.08.06.1430 ou digite um ID próprio"
+                placeholder="Ex: 2026.08.19.1430 ou digite um ID próprio"
                 className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
               />
               <button
                 type="button"
                 onClick={handleGenerateId}
                 className="bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs px-3 rounded-xl border border-sky-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-sm cursor-pointer"
-                title="Gerar ID automático no formato AAAA.MM.DD.HHMM"
+                title="Regerar novo ID único no formato AAAA.MM.DD.HHMM"
               >
-                <Zap size={14} className="text-sky-600 fill-sky-600" />
-                <span>Gerar ID Auto</span>
+                <RefreshCw size={13} className="text-sky-600" />
+                <span>Regerar ID</span>
               </button>
             </div>
             <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-              Se deixar em branco, a etiqueta exibirá Cód, Descrição e QR Code.
+              Identificador único gerado automaticamente para o QR Code da etiqueta.
             </span>
           </div>
 
@@ -292,15 +417,20 @@ export const GeralForm: React.FC<GeralFormProps> = ({
             <div className="flex items-center gap-2 font-semibold">
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>
-                Item identificado no catálogo: <strong className="font-bold text-emerald-950">{autoFilledBadge}</strong>
+                Item selecionado: <strong className="font-bold text-emerald-950">{autoFilledBadge}</strong>
               </span>
+              {fixarProduto && (
+                <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.5 rounded ml-1">
+                  Fixado para próximas chapas
+                </span>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => setAutoFilledBadge(null)}
-              className="text-emerald-600 hover:text-emerald-800 text-[11px] font-bold underline cursor-pointer"
+              onClick={handleClearProductSelection}
+              className="text-emerald-700 hover:text-emerald-900 text-[11px] font-bold underline cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-300"
             >
-              Limpar
+              Trocar Produto
             </button>
           </div>
         )}
@@ -308,11 +438,20 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Código do Item with Autocomplete suggestions */}
           <div className="md:col-span-1 relative" ref={dropdownRef}>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Código do Item / Produto *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Código do Item / Produto *
+              </label>
+              {fixarProduto && codigoItem && (
+                <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-0.5">
+                  <Pin size={10} className="rotate-45" />
+                  Fixado
+                </span>
+              )}
+            </div>
             <div className="relative">
               <input
+                ref={codigoInputRef}
                 type="text"
                 value={codigoItem}
                 onChange={e => handleCodigoChange(e.target.value)}
@@ -444,27 +583,28 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Comprimento (mm)
+                Comprimento (mm) *
               </label>
               <input
+                ref={comprimentoInputRef}
                 type="number"
                 value={comprimentoMm}
                 onChange={e => setComprimentoMm(e.target.value)}
                 placeholder="Ex: 850"
-                className="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-white text-center"
+                className="w-full h-10 px-3 border-2 border-slate-300 focus:border-[#1b367c] rounded-lg text-xs font-black focus:outline-none bg-white text-center"
               />
             </div>
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Largura (mm)
+                Largura (mm) *
               </label>
               <input
                 type="number"
                 value={larguraMm}
                 onChange={e => setLarguraMm(e.target.value)}
                 placeholder="Ex: 1250"
-                className="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-[#1b367c] bg-white text-center"
+                className="w-full h-10 px-3 border-2 border-slate-300 focus:border-[#1b367c] rounded-lg text-xs font-black focus:outline-none bg-white text-center"
               />
             </div>
 
@@ -500,7 +640,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         </div>
 
         {/* Option to automatically remember new product in catalog */}
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
           <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
             <input
               type="checkbox"
@@ -508,13 +648,13 @@ export const GeralForm: React.FC<GeralFormProps> = ({
               onChange={e => setSaveToCatalogCheck(e.target.checked)}
               className="rounded border-slate-300 text-[#1b367c] focus:ring-[#1b367c]"
             />
-            <span>Salvar novos produtos automaticamente no Catálogo para futuros lançamentos</span>
+            <span>Salvar novos produtos automaticamente no Catálogo</span>
           </label>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full md:w-auto bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-sm h-12 px-8 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-sm h-12 px-8 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSubmitting ? (
               <RefreshCw size={18} className="animate-spin" />
@@ -528,4 +668,5 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     </div>
   );
 };
+
 
