@@ -348,6 +348,12 @@ export default function App() {
   const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
   const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
 
+  const allExistingNomusIds = [
+    ...perfis.map(p => p.id_nomus || ''),
+    ...gerais.map(g => g.id_nomus || ''),
+    ...bumpers.map(b => b.id_nomus || (b.tipo === 'ID' ? b.codigo : ''))
+  ].map(id => id.trim()).filter(Boolean);
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-4 max-w-7xl mx-auto font-sans">
       {/* App Header */}
@@ -396,7 +402,7 @@ export default function App() {
                   setConfig(newCfg);
                   saveAppConfig(newCfg);
                 }}
-                existingNomusIds={perfis.map(p => p.id_nomus)}
+                existingNomusIds={allExistingNomusIds}
               />
             </div>
 
@@ -429,11 +435,7 @@ export default function App() {
                   setConfig(newCfg);
                   saveAppConfig(newCfg);
                 }}
-                existingNomusIds={[
-                  ...perfis.map(p => p.id_nomus),
-                  ...gerais.map(g => g.id_nomus),
-                  ...bumpers.map(b => b.id_nomus || '')
-                ].filter(Boolean)}
+                existingNomusIds={allExistingNomusIds}
               />
             </div>
 
@@ -466,6 +468,7 @@ export default function App() {
               onOpenCatalog={() => setIsProductCatalogOpen(true)}
               onSaveToCatalog={handleSaveCatalogProduct}
               prefilledItem={prefilledProductItem}
+              existingNomusIds={allExistingNomusIds}
             />
 
             <GeralTable

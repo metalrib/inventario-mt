@@ -99,6 +99,48 @@ export function saveLocalBumpers(items: BumperItem[]) {
   localStorage.setItem('metalrib_bumpers', JSON.stringify(items));
 }
 
+/**
+ * Generates the next sequential, unique Nomus ID in the format YYYY.MM.DD.HHMM
+ * Checks against all existing IDs in the system and avoids duplicates,
+ * incrementing minutes if the timestamp already exists or was just generated.
+ */
+export function generateUniqueNomusId(existingIds: string[] = [], currentId?: string): string {
+  const d = new Date();
+  d.setSeconds(0, 0);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
+
+  const idsToAvoid = new Set(existingIds.map(id => id ? id.trim() : '').filter(Boolean));
+  if (currentId && currentId.trim()) {
+    idsToAvoid.add(currentId.trim());
+  }
+
+  let minutesToAdd = 0;
+  while (idsToAvoid.has(base)) {
+    minutesToAdd++;
+    const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
+    base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
+  }
+
+  return base;
+}
+
+/**
+ * Formats user input as AAAA.MM.DD.HHMM when typing numeric characters
+ */
+export function formatNomusIdInput(value: string): string {
+  const raw = value.replace(/\D/g, '');
+  if (!raw) return '';
+  const trimmed = raw.slice(0, 12);
+  let formatted = '';
+  if (trimmed.length > 0) formatted += trimmed.substring(0, 4);
+  if (trimmed.length > 4) formatted += '.' + trimmed.substring(4, 6);
+  if (trimmed.length > 6) formatted += '.' + trimmed.substring(6, 8);
+  if (trimmed.length > 8) formatted += '.' + trimmed.substring(8, 12);
+  return formatted;
+}
+
 export async function syncPendingItems(): Promise<void> {
   const client = getSupabaseClient();
   if (!client) return;

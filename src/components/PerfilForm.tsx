@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Zap, ChevronDown, Plus, Minus, Check, Layers } from 'lucide-react';
 import { ProfileCatalogItem } from '../types';
+import { generateUniqueNomusId, formatNomusIdInput } from '../services/supabase';
 
 interface PerfilFormProps {
   onSavePerfil: (perfilData: {
@@ -23,7 +24,7 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
   selectedCatalogItem,
   manterMedidaPerfis,
   onToggleManterMedida,
-  existingNomusIds
+  existingNomusIds = []
 }) => {
   const [idNomus, setIdNomus] = useState('');
   const [medidaMm, setMedidaMm] = useState('');
@@ -31,20 +32,17 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const generateNomusId = () => {
-    const d = new Date();
-    d.setSeconds(0, 0);
+    const nextId = generateUniqueNomusId(existingNomusIds, idNomus);
+    setIdNomus(nextId);
+  };
 
-    const pad = (n: number) => String(n).padStart(2, '0');
-    let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
-
-    let minutesToAdd = 0;
-    while (existingNomusIds.includes(base)) {
-      minutesToAdd++;
-      const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
-      base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
+  const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (/^\d+$/.test(val) && val.length > 4) {
+      setIdNomus(formatNomusIdInput(val));
+    } else {
+      setIdNomus(val);
     }
-
-    setIdNomus(base);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,7 +58,7 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
       return;
     }
 
-    const finalId = idNomus.trim();
+    const finalId = idNomus.trim() || generateUniqueNomusId(existingNomusIds);
 
     setIsSaving(true);
     try {
@@ -104,7 +102,7 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
             <input
               type="text"
               value={idNomus}
-              onChange={e => setIdNomus(e.target.value)}
+              onChange={handleIdChange}
               placeholder="Ex: 2026.08.06.1430"
               className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-semibold font-mono focus:outline-none focus:border-[#1b367c]"
             />

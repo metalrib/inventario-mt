@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Shield, Zap } from 'lucide-react';
 import { BumperType } from '../types';
+import { generateUniqueNomusId } from '../services/supabase';
 
 interface BumperFormProps {
   onSaveBumper: (bumperData: {
@@ -28,20 +29,8 @@ export const BumperForm: React.FC<BumperFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const generateNomusId = () => {
-    const d = new Date();
-    d.setSeconds(0, 0);
-
-    const pad = (n: number) => String(n).padStart(2, '0');
-    let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
-
-    let minutesToAdd = 0;
-    while (existingNomusIds.includes(base)) {
-      minutesToAdd++;
-      const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
-      base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
-    }
-
-    setCodigo(base);
+    const nextId = generateUniqueNomusId(existingNomusIds, codigo);
+    setCodigo(nextId);
   };
 
   const handleTypeChange = (type: BumperType) => {

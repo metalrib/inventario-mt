@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2 } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
-import { findCatalogProductByCode } from '../services/supabase';
+import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/supabase';
 
 interface GeralFormProps {
   onAddItem: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
@@ -12,6 +12,7 @@ interface GeralFormProps {
   onOpenCatalog?: () => void;
   onSaveToCatalog?: (item: Omit<ProductCatalogItem, 'id'>) => Promise<void>;
   prefilledItem?: ProductCatalogItem | null;
+  existingNomusIds?: string[];
 }
 
 export const GeralForm: React.FC<GeralFormProps> = ({
@@ -22,7 +23,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   catalog = [],
   onOpenCatalog,
   onSaveToCatalog,
-  prefilledItem
+  prefilledItem,
+  existingNomusIds = []
 }) => {
   const [codigoItem, setCodigoItem] = useState('');
   const [descricaoItem, setDescricaoItem] = useState('');
@@ -111,11 +113,18 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   }).slice(0, 6);
 
   const handleGenerateId = () => {
-    const d = new Date();
-    d.setSeconds(0, 0);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const autoNomusId = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
-    setIdNomus(autoNomusId);
+    const nextId = generateUniqueNomusId(existingNomusIds, idNomus);
+    setIdNomus(nextId);
+  };
+
+  const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Format automatically as AAAA.MM.DD.HHMM if user is typing pure digits
+    if (/^\d+$/.test(val) && val.length > 4) {
+      setIdNomus(formatNomusIdInput(val));
+    } else {
+      setIdNomus(val);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -225,7 +234,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
             <input
               type="text"
               value={idNomus}
-              onChange={e => setIdNomus(e.target.value)}
+              onChange={handleIdChange}
               placeholder="Ex: 2026.08.06.1430 ou digite um ID próprio"
               className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white transition-all"
             />
