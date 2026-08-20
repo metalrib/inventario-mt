@@ -238,18 +238,25 @@ export function exportGeraisXLSX(items: GeralItem[]) {
   XLSX.writeFile(workbook, `Metalrib_Insumos_Chapas_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-export function exportBackupJSON(perfis: PerfilItem[], bumpers: BumperItem[], gerais: GeralItem[] = []) {
+export function exportBackupJSON(
+  perfis: PerfilItem[],
+  bumpers: BumperItem[],
+  gerais: GeralItem[] = [],
+  catalogo: ProductCatalogItem[] = []
+) {
   const backupObj = {
     sistema: "Metalrib Coleta PCP",
-    versao: "2.5.0",
+    versao: "2.6.0",
     data_backup: new Date().toISOString(),
     empresa: "Metalrib Portas Frigoríficas",
     total_perfis: perfis.length,
     total_bumpers: bumpers.length,
     total_gerais: gerais.length,
+    total_catalogo: catalogo.length,
     perfis,
     bumpers,
-    gerais
+    gerais,
+    catalogo
   };
 
   const jsonString = JSON.stringify(backupObj, null, 2);
@@ -262,7 +269,12 @@ export function exportBackupJSON(perfis: PerfilItem[], bumpers: BumperItem[], ge
   URL.revokeObjectURL(url);
 }
 
-export function parseBackupJSON(file: File): Promise<{ perfis: PerfilItem[]; bumpers: BumperItem[]; gerais: GeralItem[] }> {
+export function parseBackupJSON(file: File): Promise<{
+  perfis: PerfilItem[];
+  bumpers: BumperItem[];
+  gerais: GeralItem[];
+  catalogo: ProductCatalogItem[];
+}> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -273,8 +285,9 @@ export function parseBackupJSON(file: File): Promise<{ perfis: PerfilItem[]; bum
         const perfis: PerfilItem[] = Array.isArray(data.perfis) ? data.perfis : [];
         const bumpers: BumperItem[] = Array.isArray(data.bumpers) ? data.bumpers : [];
         const gerais: GeralItem[] = Array.isArray(data.gerais) ? data.gerais : [];
+        const catalogo: ProductCatalogItem[] = Array.isArray(data.catalogo) ? data.catalogo : [];
         
-        resolve({ perfis, bumpers, gerais });
+        resolve({ perfis, bumpers, gerais, catalogo });
       } catch (err) {
         reject(new Error("Arquivo JSON inválido ou corrompido."));
       }

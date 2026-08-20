@@ -13,9 +13,13 @@ import {
   Package,
   Layers,
   Sparkles,
-  Info
+  Info,
+  Code,
+  Copy,
+  CloudCheck
 } from 'lucide-react';
 import { exportCatalogXLSX, parseCatalogExcel } from '../services/exporter';
+import { getCatalogSqlScript } from '../services/supabase';
 
 interface ProductCatalogModalProps {
   isOpen: boolean;
@@ -43,6 +47,8 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [showSyncInfo, setShowSyncInfo] = useState(false);
 
   // Form State
   const [formCodigo, setFormCodigo] = useState('');
@@ -218,6 +224,22 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
             <button
               type="button"
               onClick={() => {
+                const sql = getCatalogSqlScript();
+                navigator.clipboard.writeText(sql);
+                setCopiedSql(true);
+                setShowSyncInfo(true);
+                setTimeout(() => setCopiedSql(false), 4000);
+              }}
+              className="bg-sky-50 hover:bg-sky-100 text-[#1b367c] text-xs font-bold px-2.5 h-9 rounded-lg flex items-center gap-1 transition-colors border border-sky-300 cursor-pointer shadow-2xs"
+              title="Copiar script SQL para habilitar sincronização em tempo real na nuvem do Supabase"
+            >
+              {copiedSql ? <Check size={14} className="text-emerald-600" /> : <Code size={14} />}
+              <span className="hidden sm:inline">{copiedSql ? 'SQL Copiado!' : 'SQL Supabase'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
                 if (confirm("Deseja recarregar o catálogo padrão de fábrica da Metalrib? Novos itens não serão perdidos.")) {
                   onResetDefaults();
                 }
@@ -229,6 +251,25 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Sync Info Notification if triggered */}
+        {showSyncInfo && (
+          <div className="shrink-0 p-2.5 bg-sky-50 border-b border-sky-200 flex items-center justify-between text-xs text-slate-700">
+            <div className="flex items-center gap-2">
+              <Info size={16} className="text-[#1b367c] shrink-0" />
+              <span>
+                <strong>Sincronização Ativa:</strong> O script SQL foi copiado para a área de transferência! Cole no SQL Editor do seu Supabase para persistir permanentemente a tabela de produtos na nuvem.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSyncInfo(false)}
+              className="text-slate-400 hover:text-slate-700 cursor-pointer text-xs font-bold ml-2"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
 
         {/* Category Pills (Filters) */}
         <div className="shrink-0 px-3 py-2 bg-slate-100/90 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto min-h-[44px]">

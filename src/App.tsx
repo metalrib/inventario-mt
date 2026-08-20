@@ -42,7 +42,8 @@ import {
   saveAppConfig,
   saveLocalPerfis,
   saveLocalBumpers,
-  saveLocalGerais
+  saveLocalGerais,
+  saveLocalCatalog
 } from './services/supabase';
 
 export default function App() {
@@ -333,13 +334,22 @@ export default function App() {
   };
 
   // Restored Backup Handler
-  const handleRestoredBackup = (newPerfis: PerfilItem[], newBumpers: BumperItem[], newGerais: GeralItem[] = []) => {
+  const handleRestoredBackup = (
+    newPerfis: PerfilItem[],
+    newBumpers: BumperItem[],
+    newGerais: GeralItem[] = [],
+    newCatalogo?: ProductCatalogItem[]
+  ) => {
     setPerfis(newPerfis);
     setBumpers(newBumpers);
     setGerais(newGerais);
     saveLocalPerfis(newPerfis);
     saveLocalBumpers(newBumpers);
     saveLocalGerais(newGerais);
+    if (newCatalogo && newCatalogo.length > 0) {
+      setProductCatalog(newCatalogo);
+      saveLocalCatalog(newCatalogo);
+    }
   };
 
   // Full Inventory Report Print
@@ -405,6 +415,7 @@ export default function App() {
         perfis={perfis}
         bumpers={bumpers}
         gerais={gerais}
+        productCatalog={productCatalog}
         onRestoredBackup={handleRestoredBackup}
         onPrintFullReport={handlePrintFullReport}
       />

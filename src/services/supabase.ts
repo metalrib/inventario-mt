@@ -66,12 +66,112 @@ export async function checkSupabaseStatus(): Promise<boolean> {
     const timeout = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout')), 3000)
     );
-    const query = client.from('inventario').select('id').limit(1);
+    const query = client.from('inventario_geral').select('id').limit(1);
     await Promise.race([query, timeout]);
     return true;
   } catch {
     return false;
   }
+}
+
+export interface SupabaseTablesStatus {
+  isOnline: boolean;
+  inventario: boolean;
+  inventario_bumpers: boolean;
+  inventario_geral: boolean;
+  catalogo_produtos: boolean;
+  errorMessages: { [key: string]: string };
+}
+
+export async function checkSupabaseTablesStatus(): Promise<SupabaseTablesStatus> {
+  const client = getSupabaseClient();
+  const status: SupabaseTablesStatus = {
+    isOnline: false,
+    inventario: false,
+    inventario_bumpers: false,
+    inventario_geral: false,
+    catalogo_produtos: false,
+    errorMessages: {}
+  };
+
+  if (!client) return status;
+
+  try {
+    const [t1, t2, t3, t4] = await Promise.allSettled([
+      client.from('inventario').select('id').limit(1),
+      client.from('inventario_bumpers').select('id').limit(1),
+      client.from('inventario_geral').select('id').limit(1),
+      client.from('catalogo_produtos').select('id').limit(1)
+    ]);
+
+    if (t1.status === 'fulfilled') {
+      status.inventario = !t1.value.error;
+      if (t1.value.error) status.errorMessages.inventario = t1.value.error.message;
+    }
+    if (t2.status === 'fulfilled') {
+      status.inventario_bumpers = !t2.value.error;
+      if (t2.value.error) status.errorMessages.inventario_bumpers = t2.value.error.message;
+    }
+    if (t3.status === 'fulfilled') {
+      status.inventario_geral = !t3.value.error;
+      if (t3.value.error) status.errorMessages.inventario_geral = t3.value.error.message;
+    }
+    if (t4.status === 'fulfilled') {
+      status.catalogo_produtos = !t4.value.error;
+      if (t4.value.error) status.errorMessages.catalogo_produtos = t4.value.error.message;
+    }
+
+    status.isOnline = status.inventario || status.inventario_bumpers || status.inventario_geral || status.catalogo_produtos;
+  } catch (err: any) {
+    status.errorMessages.general = err?.message || 'Falha de conexão';
+  }
+
+  return status;
+}
+
+export function getCatalogSqlScript(): string {
+  return `-- ========================================================
+-- SCRIPT SQL PARA CRIAR A TABELA DO CATÁLOGO NO SUPABASE
+-- Execute este script no SQL Editor do painel do Supabase
+-- ========================================================
+
+CREATE TABLE IF NOT EXISTS public.catalogo_produtos (
+  id BIGSERIAL PRIMARY KEY,
+  codigo TEXT UNIQUE NOT NULL,
+  descricao TEXT NOT NULL,
+  categoria TEXT DEFAULT 'Chapas',
+  unidade TEXT DEFAULT 'chapas',
+  comprimento_padrao_mm NUMERIC,
+  largura_padrao_mm NUMERIC,
+  espessura_padrao_mm NUMERIC,
+  medida_padrao_mm NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Habilitar Row Level Security (RLS)
+ALTER TABLE public.catalogo_produtos ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de acesso livre para leitura e escrita pública (Anon)
+DROP POLICY IF EXISTS "Permitir leitura publica catalogo" ON public.catalogo_produtos;
+CREATE POLICY "Permitir leitura publica catalogo"
+ON public.catalogo_produtos FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "Permitir insercao publica catalogo" ON public.catalogo_produtos;
+CREATE POLICY "Permitir insercao publica catalogo"
+ON public.catalogo_produtos FOR INSERT
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir atualizacao publica catalogo" ON public.catalogo_produtos;
+CREATE POLICY "Permitir atualizacao publica catalogo"
+ON public.catalogo_produtos FOR UPDATE
+USING (true);
+
+DROP POLICY IF EXISTS "Permitir delecao publica catalogo" ON public.catalogo_produtos;
+CREATE POLICY "Permitir delecao publica catalogo"
+ON public.catalogo_produtos FOR DELETE
+USING (true);
+`;
 }
 
 // Data operations with LocalStorage fallback & cache
@@ -717,7 +817,25 @@ export function saveLocalCatalog(items: ProductCatalogItem[]) {
 
 export async function fetchCatalog(): Promise<ProductCatalogItem[]> {
   const client = getSupabaseClient();
+  let localCatalog = getLocalCatalog();
+  const catalogMap = new Map<string, ProductCatalogItem>();
+
+  // Index existing local catalog
+  for (const item of localCatalog) {
+    if (item.codigo) {
+      catalogMap.set(item.codigo.trim().toUpperCase(), item);
+    }
+  }
+
+  // Also index default catalog as base
+  for (const item of DEFAULT_PRODUCT_CATALOG) {
+    if (item.codigo && !catalogMap.has(item.codigo.trim().toUpperCase())) {
+      catalogMap.set(item.codigo.trim().toUpperCase(), item);
+    }
+  }
+
   if (client) {
+    // 1. Try to fetch from remote catalogo_produtos table
     try {
       const { data, error } = await client
         .from('catalogo_produtos')
@@ -725,14 +843,93 @@ export async function fetchCatalog(): Promise<ProductCatalogItem[]> {
         .order('codigo', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        saveLocalCatalog(data);
-        return data;
+        for (const remote of data) {
+          const code = (remote.codigo || '').trim().toUpperCase();
+          if (code) {
+            catalogMap.set(code, {
+              id: remote.id,
+              codigo: code,
+              descricao: remote.descricao || code,
+              categoria: remote.categoria || 'Geral',
+              unidade: remote.unidade || 'peças',
+              comprimento_padrao_mm: remote.comprimento_padrao_mm ? Number(remote.comprimento_padrao_mm) : undefined,
+              largura_padrao_mm: remote.largura_padrao_mm ? Number(remote.largura_padrao_mm) : undefined,
+              espessura_padrao_mm: remote.espessura_padrao_mm ? Number(remote.espessura_padrao_mm) : undefined,
+              medida_padrao_mm: remote.medida_padrao_mm ? Number(remote.medida_padrao_mm) : undefined,
+              created_at: remote.created_at || new Date().toISOString()
+            });
+          }
+        }
       }
     } catch (e) {
-      console.warn("Supabase fetch catalog exception (using local fallback):", e);
+      console.warn("Supabase catalogo_produtos query exception:", e);
+    }
+
+    // 2. AUTO-DISCOVERY: Harvest products registered in inventario_geral on Supabase
+    try {
+      const { data: geraisRows, error: geraisError } = await client
+        .from('inventario_geral')
+        .select('codigo_item, descricao_item, comprimento_mm, largura_mm, espessura_mm, unidade')
+        .order('id', { ascending: false })
+        .limit(100);
+
+      if (!geraisError && geraisRows && geraisRows.length > 0) {
+        for (const row of geraisRows) {
+          const code = (row.codigo_item || '').trim().toUpperCase();
+          if (code && !catalogMap.has(code)) {
+            // Found a product used in inventory that wasn't in catalog! Auto-add it!
+            const newCatalogItem: ProductCatalogItem = {
+              id: `discovered_${code.replace(/[^A-Z0-9]/g, '_')}`,
+              codigo: code,
+              descricao: (row.descricao_item || code).trim(),
+              categoria: 'Chapas',
+              unidade: row.unidade || 'm²',
+              comprimento_padrao_mm: row.comprimento_mm ? Number(row.comprimento_mm) : undefined,
+              largura_padrao_mm: row.largura_mm ? Number(row.largura_mm) : undefined,
+              espessura_padrao_mm: row.espessura_mm ? Number(row.espessura_mm) : undefined,
+              created_at: new Date().toISOString()
+            };
+            catalogMap.set(code, newCatalogItem);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Auto-discovery from inventario_geral exception:", e);
+    }
+
+    // 3. AUTO-DISCOVERY: Harvest profiles from inventario
+    try {
+      const { data: perfisRows, error: perfisError } = await client
+        .from('inventario')
+        .select('codigo_perfil, descricao_perfil, medida_mm')
+        .order('id', { ascending: false })
+        .limit(50);
+
+      if (!perfisError && perfisRows && perfisRows.length > 0) {
+        for (const row of perfisRows) {
+          const code = (row.codigo_perfil || '').trim().toUpperCase();
+          if (code && !catalogMap.has(code)) {
+            const newCatalogItem: ProductCatalogItem = {
+              id: `discovered_${code.replace(/[^A-Z0-9]/g, '_')}`,
+              codigo: code,
+              descricao: (row.descricao_perfil || code).trim(),
+              categoria: 'Perfis',
+              unidade: 'barras',
+              medida_padrao_mm: row.medida_mm ? Number(row.medida_mm) : undefined,
+              created_at: new Date().toISOString()
+            };
+            catalogMap.set(code, newCatalogItem);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Auto-discovery from inventario exception:", e);
     }
   }
-  return getLocalCatalog();
+
+  const mergedList = Array.from(catalogMap.values());
+  saveLocalCatalog(mergedList);
+  return mergedList;
 }
 
 export async function saveCatalogProduct(item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }): Promise<ProductCatalogItem> {

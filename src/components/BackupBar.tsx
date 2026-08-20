@@ -1,13 +1,19 @@
 import React, { useRef } from 'react';
 import { Download, Upload, Database, Printer, FileSpreadsheet } from 'lucide-react';
-import { PerfilItem, BumperItem, GeralItem } from '../types';
+import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem } from '../types';
 import { exportBackupJSON, parseBackupJSON, exportAllToXLSX } from '../services/exporter';
 
 interface BackupBarProps {
   perfis: PerfilItem[];
   bumpers: BumperItem[];
   gerais?: GeralItem[];
-  onRestoredBackup: (perfis: PerfilItem[], bumpers: BumperItem[], gerais: GeralItem[]) => void;
+  productCatalog?: ProductCatalogItem[];
+  onRestoredBackup: (
+    perfis: PerfilItem[],
+    bumpers: BumperItem[],
+    gerais: GeralItem[],
+    catalogo?: ProductCatalogItem[]
+  ) => void;
   onPrintFullReport: () => void;
 }
 
@@ -15,17 +21,18 @@ export const BackupBar: React.FC<BackupBarProps> = ({
   perfis,
   bumpers,
   gerais = [],
+  productCatalog = [],
   onRestoredBackup,
   onPrintFullReport
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportJSON = () => {
-    if (perfis.length === 0 && bumpers.length === 0 && gerais.length === 0) {
+    if (perfis.length === 0 && bumpers.length === 0 && gerais.length === 0 && productCatalog.length === 0) {
       alert("Não há registros cadastrados para gerar backup.");
       return;
     }
-    exportBackupJSON(perfis, bumpers, gerais);
+    exportBackupJSON(perfis, bumpers, gerais, productCatalog);
   };
 
   const handleExportExcelAll = () => {
@@ -42,9 +49,12 @@ export const BackupBar: React.FC<BackupBarProps> = ({
 
     try {
       const restored = await parseBackupJSON(file);
-      const msg = `Deseja carregar este backup contendo ${restored.perfis.length} perfis, ${restored.bumpers.length} bumpers e ${restored.gerais.length} insumos?`;
+      const catalogoMsg = restored.catalogo && restored.catalogo.length > 0
+        ? ` e ${restored.catalogo.length} produtos no catálogo`
+        : '';
+      const msg = `Deseja carregar este backup contendo ${restored.perfis.length} perfis, ${restored.bumpers.length} bumpers, ${restored.gerais.length} insumos${catalogoMsg}?`;
       if (confirm(msg)) {
-        onRestoredBackup(restored.perfis, restored.bumpers, restored.gerais);
+        onRestoredBackup(restored.perfis, restored.bumpers, restored.gerais, restored.catalogo);
         alert("Backup restaurado com sucesso no sistema!");
       }
     } catch (err: any) {
