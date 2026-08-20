@@ -160,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                 : 'bg-amber-100 text-amber-900 border border-amber-200'
             }`}
-            title={isOnline ? 'Conectado à nuvem Supabase' : 'Modo Offline - Dados salvos no navegador'}
+            title={isOnline ? 'Conectado à nuvem Firebase Firestore (Tempo Real)' : 'Modo Offline - Dados salvos no navegador'}
           >
             {isOnline ? (
               <>
@@ -181,7 +181,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onSyncNow}
               disabled={isSyncing}
               className="bg-[#1b367c] hover:bg-[#14295e] active:bg-blue-900 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 shadow-xs border border-[#14295e] disabled:opacity-50 cursor-pointer shrink-0"
-              title="Sincronizar agora com a nuvem Supabase"
+              title="Atualizar dados com a nuvem"
             >
               <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
               <span>Sincronizar</span>

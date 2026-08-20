@@ -18,36 +18,37 @@ import { SettingsModal } from './components/SettingsModal';
 import { MetricsDashboard } from './components/MetricsDashboard';
 import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, ProductCatalogItem, AppConfig } from './types';
 import {
+  subscribeToPerfis,
+  subscribeToBumpers,
+  subscribeToGerais,
+  subscribeToCatalog,
   fetchPerfis,
   fetchBumpers,
   fetchGerais,
   fetchCatalog,
+  addPerfil,
+  updatePerfil,
+  deletePerfil,
+  addBumper,
+  updateBumper,
+  deleteBumper,
+  addGeral,
+  updateGeral,
+  deleteGeral,
   saveCatalogProduct,
   deleteCatalogProduct,
-  resetCatalogToDefaults,
-  insertPerfil,
-  insertBumper,
-  insertGeral,
-  updatePerfil,
-  updateBumper,
-  updateGeral,
-  deletePerfil,
-  deleteBumper,
-  deleteGeral,
-  deleteGeraisBatch,
-  clearAllPerfis,
-  clearAllBumpers,
-  clearAllGerais,
   getAppConfig,
   saveAppConfig,
   saveLocalPerfis,
   saveLocalBumpers,
   saveLocalGerais,
-  saveLocalCatalog
-} from './services/supabase';
+  saveLocalCatalog,
+  syncAllToFirebase
+} from './services/firebase';
+import { DEFAULT_PRODUCT_CATALOG } from './data/catalog';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('perfis');
+  const [activeTab, setActiveTab] = useState<TabType>('gerais');
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [config, setConfig] = useState<AppConfig>(getAppConfig());
 
@@ -77,53 +78,62 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Load data on mount and interval
-  const loadData = async (showLoadingState = false) => {
-    if (showLoadingState) setIsSyncing(true);
-    try {
-      const resPerfis = await fetchPerfis();
-      const resBumpers = await fetchBumpers();
-      const resGerais = await fetchGerais();
-      const catalogData = await fetchCatalog();
-
-      setPerfis(resPerfis.data);
-      setBumpers(resBumpers.data);
-      setGerais(resGerais.data);
-      setProductCatalog(catalogData);
-      setIsOnline(resPerfis.isOnline || resBumpers.isOnline || resGerais.isOnline);
-    } finally {
-      if (showLoadingState) setIsSyncing(false);
-    }
-  };
-
-  const handleManualSync = () => {
-    loadData(true);
-  };
-
+  // REAL-TIME FIRESTORE SUBSCRIPTIONS
   useEffect(() => {
-    loadData();
+    setIsOnline(navigator.onLine);
 
-    // Fast polling every 5 seconds for live multi-device sync
-    const interval = setInterval(() => {
-      loadData();
-    }, 5000);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-    // Sync immediately when mobile screen unlocks or browser tab comes back to focus
-    const handleFocusOrVisible = () => {
-      if (document.visibilityState === 'visible') {
-        loadData();
-      }
-    };
+    // Subscribe to all 4 collections in Real-time
+    const unsubPerfis = subscribeToPerfis((items) => {
+      setPerfis(items);
+    });
 
-    window.addEventListener('focus', handleFocusOrVisible);
-    document.addEventListener('visibilitychange', handleFocusOrVisible);
+    const unsubBumpers = subscribeToBumpers((items) => {
+      setBumpers(items);
+    });
+
+    const unsubGerais = subscribeToGerais((items) => {
+      setGerais(items);
+    });
+
+    const unsubCatalog = subscribeToCatalog((items) => {
+      setProductCatalog(items);
+    });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocusOrVisible);
-      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubPerfis();
+      unsubBumpers();
+      unsubGerais();
+      unsubCatalog();
     };
   }, []);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const [p, b, g, c] = await Promise.all([
+        fetchPerfis(),
+        fetchBumpers(),
+        fetchGerais(),
+        fetchCatalog()
+      ]);
+      setPerfis(p);
+      setBumpers(b);
+      setGerais(g);
+      setProductCatalog(c);
+      setIsOnline(true);
+    } catch {
+      setIsOnline(false);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Handlers for Perfis
   const handleSavePerfil = async (data: {
@@ -134,12 +144,11 @@ export default function App() {
     quantidade: number;
     operador?: string;
   }) => {
-    const saved = await insertPerfil({
+    const saved = await addPerfil({
       ...data,
       status: 'Com ID Nomus',
       operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
-    setPerfis(prev => [saved, ...prev]);
 
     if (config.autoImprimirAoSalvar) {
       handlePrintSinglePerfil(saved);
@@ -148,17 +157,16 @@ export default function App() {
 
   const handleEditPerfil = async (id: string | number, updated: Partial<PerfilItem>) => {
     await updatePerfil(id, updated);
-    setPerfis(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
   };
 
   const handleDeletePerfil = async (id: string | number) => {
     await deletePerfil(id);
-    setPerfis(prev => prev.filter(p => p.id !== id));
   };
 
   const handleClearPerfis = async () => {
-    await clearAllPerfis();
-    setPerfis([]);
+    for (const p of perfis) {
+      await deletePerfil(p.id);
+    }
   };
 
   // Handlers for Bumpers
@@ -169,11 +177,10 @@ export default function App() {
     quantidade: number;
     operador?: string;
   }) => {
-    const saved = await insertBumper({
+    const saved = await addBumper({
       ...data,
       operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
-    setBumpers(prev => [saved, ...prev]);
 
     if (config.autoImprimirAoSalvar) {
       handlePrintSingleBumper(saved);
@@ -182,76 +189,63 @@ export default function App() {
 
   const handleEditBumper = async (id: string | number, updated: Partial<BumperItem>) => {
     await updateBumper(id, updated);
-    setBumpers(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
   };
 
   const handleDeleteBumper = async (id: string | number) => {
     await deleteBumper(id);
-    setBumpers(prev => prev.filter(b => b.id !== id));
   };
 
   const handleClearBumpers = async () => {
-    await clearAllBumpers();
-    setBumpers([]);
+    for (const b of bumpers) {
+      await deleteBumper(b.id);
+    }
   };
 
   // Handlers for Chapas & Gerais
   const handleSaveGeral = async (itemData: Omit<GeralItem, 'id'>) => {
-    const saved = await insertGeral(itemData);
-    setGerais(prev => [saved, ...prev]);
+    const saved = await addGeral(itemData);
     return saved;
   };
 
   const handleEditGeral = async (id: string | number, updated: Partial<GeralItem>) => {
     await updateGeral(id, updated);
-    setGerais(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
   };
 
   const handleDeleteGeral = async (id: string | number) => {
     await deleteGeral(id);
-    setGerais(prev => prev.filter(g => g.id !== id));
   };
 
   const handleClearGerais = async () => {
-    await clearAllGerais();
-    setGerais([]);
+    for (const g of gerais) {
+      await deleteGeral(g.id);
+    }
   };
 
   const handleDeleteBatchGerais = async (ids: (string | number)[]) => {
-    await deleteGeraisBatch(ids);
-    setGerais(prev => prev.filter(g => !ids.includes(g.id)));
+    for (const id of ids) {
+      await deleteGeral(id);
+    }
   };
 
   // Product Catalog Handlers
   const handleSaveCatalogProduct = async (item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }) => {
-    const saved = await saveCatalogProduct(item);
-    setProductCatalog(prev => {
-      const idx = prev.findIndex(p => p.codigo.toUpperCase() === saved.codigo.toUpperCase());
-      if (idx !== -1) {
-        const next = [...prev];
-        next[idx] = saved;
-        return next;
-      }
-      return [saved, ...prev];
-    });
+    await saveCatalogProduct(item);
   };
 
   const handleDeleteCatalogProduct = async (id: string | number) => {
     await deleteCatalogProduct(id);
-    setProductCatalog(prev => prev.filter(p => p.id !== id));
   };
 
   const handleResetCatalogDefaults = async () => {
-    const defaults = await resetCatalogToDefaults();
-    setProductCatalog(defaults);
+    for (const def of DEFAULT_PRODUCT_CATALOG) {
+      await saveCatalogProduct(def);
+    }
   };
 
   const handleImportCatalogProducts = async (items: ProductCatalogItem[]) => {
     for (const item of items) {
       await saveCatalogProduct(item);
     }
-    const updated = await fetchCatalog();
-    setProductCatalog(updated);
   };
 
   // Label Printing Helpers
@@ -334,7 +328,7 @@ export default function App() {
   };
 
   // Restored Backup Handler
-  const handleRestoredBackup = (
+  const handleRestoredBackup = async (
     newPerfis: PerfilItem[],
     newBumpers: BumperItem[],
     newGerais: GeralItem[] = [],
@@ -350,6 +344,8 @@ export default function App() {
       setProductCatalog(newCatalogo);
       saveLocalCatalog(newCatalogo);
     }
+    // Sync restored batch straight into Firestore
+    await syncAllToFirebase(newPerfis, newBumpers, newGerais, newCatalogo || []);
   };
 
   // Full Inventory Report Print
@@ -448,20 +444,18 @@ export default function App() {
                 operadorPadrao={config.operadorPadrao}
               />
             </div>
-
-            <div className="md:col-span-7 xl:col-span-8 min-w-0">
+            <div className="md:col-span-7 xl:col-span-8">
               <PerfilTable
                 perfis={perfis}
-                onRefresh={loadData}
-                onPrintLabel={handlePrintSinglePerfil}
-                onPrintBatchLabels={handlePrintBatchPerfis}
-                onEditItem={item => {
+                onEditPerfil={(item) => {
                   setEditingItem(item);
                   setEditingItemType('perfil');
                   setIsEditModalOpen(true);
                 }}
-                onDeleteItem={handleDeletePerfil}
-                onClearAll={handleClearPerfis}
+                onDeletePerfil={handleDeletePerfil}
+                onClearPerfis={handleClearPerfis}
+                onPrintSingle={handlePrintSinglePerfil}
+                onPrintBatch={handlePrintBatchPerfis}
               />
             </div>
           </div>
@@ -482,62 +476,68 @@ export default function App() {
                 operadorPadrao={config.operadorPadrao}
               />
             </div>
-
-            <div className="md:col-span-7 xl:col-span-8 min-w-0">
+            <div className="md:col-span-7 xl:col-span-8">
               <BumperTable
                 bumpers={bumpers}
-                onRefresh={loadData}
-                onPrintLabel={handlePrintSingleBumper}
-                onPrintBatchLabels={handlePrintBatchBumpers}
-                onEditItem={item => {
+                onEditBumper={(item) => {
                   setEditingItem(item);
                   setEditingItemType('bumper');
                   setIsEditModalOpen(true);
                 }}
-                onDeleteItem={handleDeleteBumper}
-                onClearAll={handleClearBumpers}
+                onDeleteBumper={handleDeleteBumper}
+                onClearBumpers={handleClearBumpers}
+                onPrintSingle={handlePrintSingleBumper}
+                onPrintBatch={handlePrintBatchBumpers}
               />
             </div>
           </div>
         )}
 
         {activeTab === 'gerais' && (
-          <div className="space-y-4">
-            <GeralForm
-              onAddItem={handleSaveGeral}
-              operadorPadrao={config.operadorPadrao}
-              autoImprimirAoSalvar={config.autoImprimirAoSalvar}
-              onOpenPrintModal={handlePrintSingleGeral}
-              catalog={productCatalog}
-              onOpenCatalog={() => setIsProductCatalogOpen(true)}
-              onSaveToCatalog={handleSaveCatalogProduct}
-              prefilledItem={prefilledProductItem}
-              existingNomusIds={allExistingNomusIds}
-            />
-
-            <GeralTable
-              items={gerais}
-              onRefresh={loadData}
-              onDeleteItem={handleDeleteGeral}
-              onDeleteBatch={handleDeleteBatchGerais}
-              onClearAll={handleClearGerais}
-              onUpdateItem={handleEditGeral}
-              onOpenBatchPrint={handlePrintBatchGerais}
-              onOpenSinglePrint={handlePrintSingleGeral}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
+            <div className="md:col-span-5 xl:col-span-4">
+              <GeralForm
+                onSaveGeral={handleSaveGeral}
+                productCatalog={productCatalog}
+                prefilledProductItem={prefilledProductItem}
+                onClearPrefilledProduct={() => setPrefilledProductItem(null)}
+                existingNomusIds={allExistingNomusIds}
+                onOpenCatalogModal={() => setIsProductCatalogOpen(true)}
+                operadorPadrao={config.operadorPadrao}
+                onPrintGeralItem={handlePrintSingleGeral}
+              />
+            </div>
+            <div className="md:col-span-7 xl:col-span-8">
+              <GeralTable
+                gerais={gerais}
+                onEditGeral={handleEditGeral}
+                onDeleteGeral={handleDeleteGeral}
+                onClearGerais={handleClearGerais}
+                onPrintSingle={handlePrintSingleGeral}
+                onPrintBatch={handlePrintBatchGerais}
+                onDeleteBatch={handleDeleteBatchGerais}
+              />
+            </div>
           </div>
         )}
 
-        {activeTab === 'metrics' && (
-          <MetricsDashboard perfis={perfis} bumpers={bumpers} gerais={gerais} />
+        {activeTab === 'metricas' && (
+          <MetricsDashboard
+            perfis={perfis}
+            bumpers={bumpers}
+            gerais={gerais}
+          />
         )}
       </main>
 
-      {/* Modals */}
+      {/* Catalog Modals */}
       <CatalogModal
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
-        onSelectProfile={item => setSelectedCatalogItem(item)}
+        onSelectPerfil={(item) => {
+          setSelectedCatalogItem(item);
+          setIsCatalogOpen(false);
+        }}
       />
 
       <ProductCatalogModal
@@ -548,37 +548,44 @@ export default function App() {
         onDeleteItem={handleDeleteCatalogProduct}
         onResetDefaults={handleResetCatalogDefaults}
         onImportItems={handleImportCatalogProducts}
-        onSelectForUse={item => {
+        onSelectForUse={(item) => {
           setPrefilledProductItem(item);
+          setIsProductCatalogOpen(false);
           setActiveTab('gerais');
         }}
       />
 
+      {/* Printing Modal */}
       <LabelPrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        itemsToPrint={printItems}
+        items={printItems}
       />
 
+      {/* Edit Item Modal */}
       <EditModal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingItem(null);
+        }}
         item={editingItem}
         itemType={editingItemType}
         onSavePerfil={handleEditPerfil}
         onSaveBumper={handleEditBumper}
       />
 
+      {/* Barcode / QR Scanner Modal */}
       <ScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        onScanResult={scanned => {
-          setIsScannerOpen(false);
-          setScannedCodeForModal(scanned);
+        onScan={(code) => {
+          setScannedCodeForModal(code);
           setIsScanResultOpen(true);
         }}
       />
 
+      {/* Scan Result Modal */}
       <ScanResultModal
         isOpen={isScanResultOpen}
         onClose={() => {
@@ -589,43 +596,18 @@ export default function App() {
         perfis={perfis}
         bumpers={bumpers}
         gerais={gerais}
-        onAddPerfil={async p => {
-          const saved = await insertPerfil({ ...p, operador: config.operadorPadrao });
-          setPerfis(prev => [saved, ...prev.filter(i => String(i.id) !== String(saved.id))]);
-          setActiveTab('perfis');
-        }}
-        onAddBumper={async b => {
-          const saved = await insertBumper({ ...b, operador: config.operadorPadrao });
-          setBumpers(prev => [saved, ...prev.filter(i => String(i.id) !== String(saved.id))]);
-          setActiveTab('bumpers');
-        }}
-        onAddGeral={async g => {
-          const saved = await insertGeral({ ...g, operador: config.operadorPadrao });
-          setGerais(prev => [saved, ...prev.filter(i => String(i.id) !== String(saved.id))]);
-          setActiveTab('gerais');
-        }}
-        onIncrementPerfil={async (id, newQty) => {
-          await handleEditPerfil(id, { quantidade: newQty });
-        }}
-        onIncrementBumper={async (id, newQty) => {
-          await handleEditBumper(id, { quantidade: newQty });
-        }}
-        onIncrementGeral={async (id, newQty) => {
-          await handleEditGeral(id, { quantidade: newQty });
-        }}
       />
 
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         config={config}
-        onSaveConfig={newCfg => {
-          setConfig(newCfg);
-          saveAppConfig(newCfg);
-          loadData();
+        onSaveConfig={(newConfig) => {
+          setConfig(newConfig);
+          saveAppConfig(newConfig);
         }}
       />
     </div>
   );
 }
-
