@@ -362,9 +362,15 @@ export default function App() {
     saveAppConfig(updated);
   };
 
-  const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
-  const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
-  const totalGeraisM2 = gerais.reduce((acc, g) => {
+  const safePerfis = perfis || [];
+  const safeBumpers = bumpers || [];
+  const safeGerais = gerais || [];
+  const safeCatalog = productCatalog || [];
+
+  const totalPerfisMeters = safePerfis.reduce((acc, p) => acc + ((p.medida_mm || 0) * (p.quantidade || 0)) / 1000, 0);
+  const totalBumpersQty = safeBumpers.reduce((acc, b) => acc + (b.quantidade || 0), 0);
+  const totalGeraisM2 = safeGerais.reduce((acc, g) => {
+    if (!g) return acc;
     const isM2 = g.unidade === 'm²' || g.unidade === 'metros quadrados' || g.unidade === 'm2';
     if (g.comprimento_mm && g.largura_mm) {
       if (isM2) {
@@ -374,7 +380,7 @@ export default function App() {
         }
         return acc + (val > 0 ? val : ((g.comprimento_mm * g.largura_mm) / 1000000));
       }
-      return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * (g.quantidade || 1);
+      return acc + ((g.comprimento_mm * g.largura_mm) / 1000000) * (Number(g.quantidade) || 1);
     }
     if (isM2) {
       return acc + (Number(g.quantidade) || 0);
@@ -383,10 +389,10 @@ export default function App() {
   }, 0);
 
   const allExistingNomusIds = [
-    ...perfis.map(p => p.id_nomus || ''),
-    ...gerais.map(g => g.id_nomus || ''),
-    ...bumpers.map(b => b.id_nomus || (b.tipo === 'ID' ? b.codigo : ''))
-  ].map(id => id.trim()).filter(Boolean);
+    ...safePerfis.map(p => p?.id_nomus || ''),
+    ...safeGerais.map(g => g?.id_nomus || ''),
+    ...safeBumpers.map(b => b?.id_nomus || (b?.tipo === 'ID' ? b?.codigo : ''))
+  ].map(id => (id || '').trim()).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-3 md:p-4 max-w-7xl mx-auto font-sans w-full box-border">
@@ -398,7 +404,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenCatalog={() => setIsProductCatalogOpen(true)}
-        catalogCount={productCatalog.length}
+        catalogCount={safeCatalog.length}
         totalPerfisMeters={totalPerfisMeters}
         totalBumpersQty={totalBumpersQty}
         totalGeraisM2={totalGeraisM2}
@@ -408,10 +414,10 @@ export default function App() {
 
       {/* Backup & History Bar */}
       <BackupBar
-        perfis={perfis}
-        bumpers={bumpers}
-        gerais={gerais}
-        productCatalog={productCatalog}
+        perfis={safePerfis}
+        bumpers={safeBumpers}
+        gerais={safeGerais}
+        productCatalog={safeCatalog}
         onRestoredBackup={handleRestoredBackup}
         onPrintFullReport={handlePrintFullReport}
       />
@@ -420,9 +426,9 @@ export default function App() {
       <TabsNav
         activeTab={activeTab}
         onChangeTab={setActiveTab}
-        perfisCount={perfis.length}
-        bumpersCount={bumpers.length}
-        geraisCount={gerais.length}
+        perfisCount={safePerfis.length}
+        bumpersCount={safeBumpers.length}
+        geraisCount={safeGerais.length}
       />
 
       {/* Main Tab Views */}

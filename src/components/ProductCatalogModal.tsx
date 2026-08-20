@@ -20,7 +20,7 @@ import { exportCatalogXLSX, parseCatalogExcel } from '../services/exporter';
 interface ProductCatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
-  catalog: ProductCatalogItem[];
+  catalog?: ProductCatalogItem[];
   onSaveItem: (item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }) => Promise<void>;
   onDeleteItem: (id: string | number) => Promise<void>;
   onResetDefaults: () => Promise<void>;
@@ -31,7 +31,7 @@ interface ProductCatalogModalProps {
 export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
   isOpen,
   onClose,
-  catalog,
+  catalog = [],
   onSaveItem,
   onDeleteItem,
   onResetDefaults,
@@ -55,14 +55,16 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
 
   if (!isOpen) return null;
 
-  const categories = ['Todos', ...Array.from(new Set(catalog.map(p => p.categoria || 'Geral')))];
+  const safeCatalog = catalog || [];
+  const categories = ['Todos', ...Array.from(new Set(safeCatalog.map(p => p.categoria || 'Geral')))];
 
-  const filteredItems = catalog.filter(item => {
+  const filteredItems = safeCatalog.filter(item => {
+    if (!item) return false;
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
       !term ||
-      item.codigo.toLowerCase().includes(term) ||
-      item.descricao.toLowerCase().includes(term) ||
+      (item.codigo && item.codigo.toLowerCase().includes(term)) ||
+      (item.descricao && item.descricao.toLowerCase().includes(term)) ||
       (item.categoria && item.categoria.toLowerCase().includes(term));
 
     const matchesCategory =
@@ -151,7 +153,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
               <h2 className="text-base sm:text-lg font-black flex items-center gap-2">
                 <span>Catálogo & Base de Produtos</span>
                 <span className="text-xs font-bold px-2 py-0.5 bg-sky-500/30 text-sky-200 rounded-full border border-sky-400/30">
-                  {catalog.length} cadastrados
+                  {safeCatalog.length} cadastrados
                 </span>
               </h2>
               <p className="text-xs text-blue-200">
@@ -195,7 +197,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
 
             <button
               type="button"
-              onClick={() => exportCatalogXLSX(catalog)}
+              onClick={() => exportCatalogXLSX(safeCatalog)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2.5 h-9 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
               title="Exportar base completa para planilha Excel (.xlsx)"
             >
@@ -237,8 +239,8 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
           </span>
           {categories.map(cat => {
             const count = cat === 'Todos'
-              ? catalog.length
-              : catalog.filter(i => (i.categoria || 'Geral') === cat).length;
+              ? safeCatalog.length
+              : safeCatalog.filter(i => (i.categoria || 'Geral') === cat).length;
             const isSelected = selectedCategory === cat;
 
             return (

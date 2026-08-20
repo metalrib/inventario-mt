@@ -3,28 +3,34 @@ import { Layers, Shield, PieChart, Award, BarChart2, Package } from 'lucide-reac
 import { PerfilItem, BumperItem, GeralItem } from '../types';
 
 interface MetricsDashboardProps {
-  perfis: PerfilItem[];
-  bumpers: BumperItem[];
+  perfis?: PerfilItem[];
+  bumpers?: BumperItem[];
   gerais?: GeralItem[];
 }
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
-  perfis,
-  bumpers,
+  perfis = [],
+  bumpers = [],
   gerais = []
 }) => {
+  const safePerfis = perfis || [];
+  const safeBumpers = bumpers || [];
+  const safeGerais = gerais || [];
+
   // Compute profiles analytics
-  const totalPerfisMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
-  const totalPerfisQty = perfis.reduce((acc, p) => acc + p.quantidade, 0);
+  const totalPerfisMeters = safePerfis.reduce((acc, p) => acc + ((p.medida_mm || 0) * (p.quantidade || 0)) / 1000, 0);
+  const totalPerfisQty = safePerfis.reduce((acc, p) => acc + (p.quantidade || 0), 0);
 
   // Group by profile code
   const profileDistribution: Record<string, { desc: string; count: number; meters: number }> = {};
-  perfis.forEach(p => {
-    if (!profileDistribution[p.codigo_perfil]) {
-      profileDistribution[p.codigo_perfil] = { desc: p.descricao_perfil, count: 0, meters: 0 };
+  safePerfis.forEach(p => {
+    if (!p) return;
+    const code = p.codigo_perfil || 'Desconhecido';
+    if (!profileDistribution[code]) {
+      profileDistribution[code] = { desc: p.descricao_perfil || code, count: 0, meters: 0 };
     }
-    profileDistribution[p.codigo_perfil].count += p.quantidade;
-    profileDistribution[p.codigo_perfil].meters += (p.medida_mm * p.quantidade) / 1000;
+    profileDistribution[code].count += (p.quantidade || 0);
+    profileDistribution[code].meters += ((p.medida_mm || 0) * (p.quantidade || 0)) / 1000;
   });
 
   const sortedDistribution = Object.entries(profileDistribution).sort(
@@ -32,11 +38,11 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   );
 
   // Bumpers analytics
-  const totalBumpersQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
-  const totalBumpersMeters = bumpers.reduce((acc, b) => acc + (b.medida_mm * b.quantidade) / 1000, 0);
+  const totalBumpersQty = safeBumpers.reduce((acc, b) => acc + (b.quantidade || 0), 0);
+  const totalBumpersMeters = safeBumpers.reduce((acc, b) => acc + ((b.medida_mm || 0) * (b.quantidade || 0)) / 1000, 0);
 
   // Gerais analytics
-  const totalGeraisQty = gerais.reduce((acc, g) => acc + g.quantidade, 0);
+  const totalGeraisQty = safeGerais.reduce((acc, g) => acc + (g.quantidade || 0), 0);
 
   return (
     <div className="space-y-4">

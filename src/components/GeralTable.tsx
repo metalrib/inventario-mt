@@ -4,26 +4,42 @@ import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, Fi
 import { exportGeraisXLSX } from '../services/exporter';
 
 interface GeralTableProps {
-  items: GeralItem[];
+  items?: GeralItem[];
+  gerais?: GeralItem[];
   onRefresh?: () => void;
   onDeleteItem: (id: string | number) => void;
   onDeleteBatch?: (ids: (string | number)[]) => void;
-  onClearAll: () => void;
-  onUpdateItem: (id: string | number, updated: Partial<GeralItem>) => void;
-  onOpenBatchPrint: (items: GeralItem[]) => void;
-  onOpenSinglePrint: (item: GeralItem) => void;
+  onClearAll?: () => void;
+  onClearGerais?: () => void;
+  onUpdateItem?: (id: string | number, updated: Partial<GeralItem>) => void;
+  onEditGeral?: (id: string | number, updated: Partial<GeralItem>) => void;
+  onOpenBatchPrint?: (items: GeralItem[]) => void;
+  onPrintBatch?: (items: GeralItem[]) => void;
+  onOpenSinglePrint?: (item: GeralItem) => void;
+  onPrintSingle?: (item: GeralItem) => void;
 }
 
 export const GeralTable: React.FC<GeralTableProps> = ({
   items,
+  gerais,
   onRefresh,
   onDeleteItem,
   onDeleteBatch,
   onClearAll,
+  onClearGerais,
   onUpdateItem,
+  onEditGeral,
   onOpenBatchPrint,
-  onOpenSinglePrint
+  onPrintBatch,
+  onOpenSinglePrint,
+  onPrintSingle
 }) => {
+  const itemList = items || gerais || [];
+  const handleClear = onClearAll || onClearGerais || (() => {});
+  const handleUpdate = onUpdateItem || onEditGeral || (() => {});
+  const handleBatchPrintCallback = onOpenBatchPrint || onPrintBatch || (() => {});
+  const handleSinglePrintCallback = onOpenSinglePrint || onPrintSingle || (() => {});
+
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editForm, setEditForm] = useState<Partial<GeralItem>>({});
@@ -37,13 +53,14 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   });
 
   // Filter and Sort
-  const filteredItems = items.filter(item => {
+  const filteredItems = itemList.filter(item => {
+    if (!item) return false;
     const searchLower = filters.search.toLowerCase();
     const matchSearch =
       !filters.search ||
-      item.codigo_item.toLowerCase().includes(searchLower) ||
-      item.descricao_item.toLowerCase().includes(searchLower) ||
-      item.id_nomus.toLowerCase().includes(searchLower) ||
+      (item.codigo_item && item.codigo_item.toLowerCase().includes(searchLower)) ||
+      (item.descricao_item && item.descricao_item.toLowerCase().includes(searchLower)) ||
+      (item.id_nomus && item.id_nomus.toLowerCase().includes(searchLower)) ||
       (item.operador && item.operador.toLowerCase().includes(searchLower));
 
     return matchSearch;
@@ -64,7 +81,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   });
 
   // Totals
-  const totalM2 = items.reduce((acc, i) => {
+  const totalM2 = itemList.reduce((acc, i) => {
+    if (!i) return acc;
     const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
     if (i.comprimento_mm && i.largura_mm) {
       if (isM2) {
@@ -82,7 +100,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
     return acc;
   }, 0);
 
-  const totalQty = items.reduce((acc, i) => {
+  const totalQty = itemList.reduce((acc, i) => {
+    if (!i) return acc;
     const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
     if (isM2) {
       const val = Number(i.quantidade) || 0;
@@ -108,9 +127,9 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   };
 
   const handleBatchPrint = () => {
-    const selectedItems = items.filter(i => selectedIds.includes(i.id));
+    const selectedItems = itemList.filter(i => selectedIds.includes(i.id));
     if (selectedItems.length > 0) {
-      onOpenBatchPrint(selectedItems);
+      handleBatchPrintCallback(selectedItems);
     }
   };
 
@@ -128,7 +147,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   const handleClearAllConfirm = () => {
     if (confirm("Tem certeza que deseja apagar TODOS os itens e chapas da lista? Esta ação não pode ser desfeita.")) {
-      onClearAll();
+      handleClear();
       setSelectedIds([]);
     }
   };
@@ -140,7 +159,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   };
 
   const handleSaveEdit = (id: string | number) => {
-    onUpdateItem(id, editForm);
+    handleUpdate(id, editForm);
     setEditingId(null);
   };
 
@@ -160,7 +179,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           <h2 className="font-extrabold text-base text-[#1b367c] flex items-center gap-2">
             <span>Chapas e Insumos Cadastrados</span>
             <span className="text-xs font-bold px-2.5 py-0.5 bg-blue-100 text-[#1b367c] rounded-full">
-              {items.length} registros
+              {itemList.length} registros
             </span>
           </h2>
           <div className="text-xs text-slate-500 font-medium mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -200,8 +219,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => exportGeraisXLSX(items)}
-            disabled={items.length === 0}
+            onClick={() => exportGeraisXLSX(itemList)}
+            disabled={itemList.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
             title="Exportar tabela de insumos e chapas para Excel (.xlsx)"
           >
@@ -236,7 +255,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           <button
             type="button"
             onClick={handleClearAllConfirm}
-            disabled={items.length === 0}
+            disabled={itemList.length === 0}
             className="bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-bold text-xs px-3.5 h-10 rounded-xl flex items-center gap-1.5 border border-slate-300 hover:border-rose-300 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             title="Limpar todos os itens e chapas da lista"
           >
@@ -524,8 +543,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
           <button
             type="button"
-            onClick={() => onOpenBatchPrint(items)}
-            disabled={items.length === 0}
+            onClick={() => handleBatchPrintCallback(itemList)}
+            disabled={itemList.length === 0}
             className="bg-[#1b367c] hover:bg-[#13275b] text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
           >
             <Printer size={15} />
@@ -536,8 +555,8 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => exportGeraisXLSX(items)}
-            disabled={items.length === 0}
+            onClick={() => exportGeraisXLSX(itemList)}
+            disabled={itemList.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-initial cursor-pointer shadow-sm"
             title="Exportar chapas e insumos para Excel (.xlsx)"
           >
@@ -548,7 +567,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           <button
             type="button"
             onClick={handleClearAllConfirm}
-            disabled={items.length === 0}
+            disabled={itemList.length === 0}
             className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50 cursor-pointer shadow-sm"
             title="Limpar todos os itens e chapas da lista"
           >

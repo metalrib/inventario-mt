@@ -46,6 +46,7 @@ const STORAGE_KEY_PERFIS = 'metalrib_perfis_v2';
 const STORAGE_KEY_BUMPERS = 'metalrib_bumpers_v2';
 const STORAGE_KEY_GERAIS = 'metalrib_gerais_v1';
 const STORAGE_KEY_CATALOG = 'metalrib_product_catalog_v2';
+const CONFIG_KEY = 'metalrib_app_config_v1';
 
 export function getLocalPerfis(): PerfilItem[] {
   try {
@@ -610,8 +611,49 @@ export async function syncAllToFirebase(
   }
 }
 
-// ----------------- APP CONFIG -----------------
-const CONFIG_KEY = 'metalrib_app_config_v2';
+// ----------------- NOMUS ID & CATALOG HELPERS -----------------
+
+export function generateUniqueNomusId(existingIds: string[] = [], currentId?: string): string {
+  const d = new Date();
+  d.setSeconds(0, 0);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
+
+  const idsToAvoid = new Set(existingIds.map(id => id ? id.trim() : '').filter(Boolean));
+  if (currentId && currentId.trim()) {
+    idsToAvoid.add(currentId.trim());
+  }
+
+  let minutesToAdd = 0;
+  while (idsToAvoid.has(base)) {
+    minutesToAdd++;
+    const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
+    base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
+  }
+
+  return base;
+}
+
+export function formatNomusIdInput(value: string): string {
+  const raw = value.replace(/\D/g, '');
+  if (!raw) return '';
+  const trimmed = raw.slice(0, 12);
+  let formatted = '';
+  if (trimmed.length > 0) formatted += trimmed.substring(0, 4);
+  if (trimmed.length > 4) formatted += '.' + trimmed.substring(4, 6);
+  if (trimmed.length > 6) formatted += '.' + trimmed.substring(6, 8);
+  if (trimmed.length > 8) formatted += '.' + trimmed.substring(8, 12);
+  return formatted;
+}
+
+export function findCatalogProductByCode(code: string, catalog?: ProductCatalogItem[]): ProductCatalogItem | undefined {
+  const clean = code.trim().toUpperCase();
+  if (!clean) return undefined;
+  const list = catalog || getLocalCatalog();
+  return list.find(p => (p.codigo || '').trim().toUpperCase() === clean);
+}
+
 
 export const DEFAULT_CONFIG: AppConfig = {
   supabaseUrl: '',

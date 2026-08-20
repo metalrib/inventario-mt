@@ -19,7 +19,8 @@ export interface PrintItem {
 interface LabelPrintModalProps {
   isOpen: boolean;
   onClose: () => void;
-  itemsToPrint: PrintItem[];
+  itemsToPrint?: PrintItem[];
+  items?: PrintItem[];
 }
 
 // Helper component for previewing QR Code on UI
@@ -57,21 +58,23 @@ async function generateQRCodeBase64(value: string): Promise<string> {
 export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
   isOpen,
   onClose,
-  itemsToPrint
+  itemsToPrint,
+  items
 }) => {
+  const safeItems = itemsToPrint || items || [];
   const [copiesPerItem, setCopiesPerItem] = useState(1);
   const [customId, setCustomId] = useState('');
   const [customMedida, setCustomMedida] = useState('');
 
   useEffect(() => {
-    if (itemsToPrint.length > 0) {
-      const first = itemsToPrint[0];
-      setCustomId(first.idNomus || '');
-      setCustomMedida(first.medidaFormatted || (first.medidaMm ? `${first.medidaMm} MM` : ''));
+    if (safeItems.length > 0) {
+      const first = safeItems[0];
+      setCustomId(first?.idNomus || '');
+      setCustomMedida(first?.medidaFormatted || (first?.medidaMm ? `${first.medidaMm} MM` : ''));
     }
-  }, [itemsToPrint]);
+  }, [safeItems]);
 
-  if (!isOpen || itemsToPrint.length === 0) return null;
+  if (!isOpen || safeItems.length === 0) return null;
 
   const handleExecutePrint = async () => {
     const printArea = document.getElementById("printArea");
@@ -80,11 +83,11 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
     let html = "";
     const copies = Math.max(1, copiesPerItem);
 
-    for (const item of itemsToPrint) {
+    for (const item of safeItems) {
       const itemCode = item.codigoItem || '';
       const itemDesc = item.descricaoItem || item.descricaoExtra || '';
-      const displayMedida = itemsToPrint.length === 1 ? customMedida : (item.medidaFormatted || (item.medidaMm ? `${item.medidaMm} MM` : ''));
-      const idVal = itemsToPrint.length === 1 ? customId.trim() : (item.idNomus || '').trim();
+      const displayMedida = safeItems.length === 1 ? customMedida : (item.medidaFormatted || (item.medidaMm ? `${item.medidaMm} MM` : ''));
+      const idVal = safeItems.length === 1 ? customId.trim() : (item.idNomus || '').trim();
       
       const payloadObj = {
         v: 1,
@@ -159,11 +162,11 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
     window.print();
   };
 
-  const previewItem = itemsToPrint[0];
+  const previewItem = safeItems[0] || {};
   const previewItemCode = previewItem.codigoItem || '';
   const previewDesc = previewItem.descricaoItem || previewItem.descricaoExtra || '';
-  const previewMedida = itemsToPrint.length === 1 ? customMedida : (previewItem.medidaFormatted || (previewItem.medidaMm ? `${previewItem.medidaMm} MM` : ''));
-  const previewId = itemsToPrint.length === 1 ? customId.trim() : (previewItem.idNomus || '').trim();
+  const previewMedida = safeItems.length === 1 ? customMedida : (previewItem.medidaFormatted || (previewItem.medidaMm ? `${previewItem.medidaMm} MM` : ''));
+  const previewId = safeItems.length === 1 ? customId.trim() : (previewItem.idNomus || '').trim();
   const previewEncodeValue = JSON.stringify({
     v: 1,
     id_nomus: previewId,
@@ -187,7 +190,7 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -200,7 +203,7 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-500 uppercase">
-                Pré-visualização da Etiqueta ({itemsToPrint.length} modelo(s))
+                Pré-visualização da Etiqueta ({safeItems.length} modelo(s))
               </span>
               <span className="text-[10px] bg-[#1b367c] text-white font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                 <QrCode size={12} />
@@ -269,7 +272,7 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
           </div>
 
           {/* Quick Edit Inputs */}
-          {itemsToPrint.length === 1 && (
+          {safeItems.length === 1 && (
             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
@@ -314,7 +317,7 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
                 className="w-20 h-9 px-2 border border-slate-300 rounded-lg text-xs font-bold text-center focus:outline-none focus:border-[#1b367c] bg-white"
               />
               <span className="text-xs text-slate-500 font-semibold">
-                Total: <strong>{itemsToPrint.length * copiesPerItem} etiqueta(s)</strong>
+                Total: <strong>{safeItems.length * copiesPerItem} etiqueta(s)</strong>
               </span>
             </div>
           </div>
@@ -337,17 +340,17 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors"
+            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={handleExecutePrint}
-            className="bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-xs px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-md"
+            className="bg-[#1b367c] hover:bg-[#13275b] active:bg-blue-900 text-white font-extrabold text-xs px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-md cursor-pointer"
           >
             <Printer size={16} />
-            <span>Imprimir ({itemsToPrint.length * copiesPerItem})</span>
+            <span>Imprimir ({safeItems.length * copiesPerItem})</span>
           </button>
         </div>
       </div>

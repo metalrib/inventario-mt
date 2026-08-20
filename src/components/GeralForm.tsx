@@ -1,31 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
-import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/supabase';
+import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/firebase';
 
 interface GeralFormProps {
-  onAddItem: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
-  operadorPadrao: string;
+  onAddItem?: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
+  onSaveGeral?: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
+  operadorPadrao?: string;
   autoImprimirAoSalvar?: boolean;
   onOpenPrintModal?: (item: GeralItem) => void;
+  onPrintGeralItem?: (item: GeralItem) => void;
   catalog?: ProductCatalogItem[];
+  productCatalog?: ProductCatalogItem[];
   onOpenCatalog?: () => void;
+  onOpenCatalogModal?: () => void;
   onSaveToCatalog?: (item: Omit<ProductCatalogItem, 'id'>) => Promise<void>;
   prefilledItem?: ProductCatalogItem | null;
+  prefilledProductItem?: ProductCatalogItem | null;
+  onClearPrefilledProduct?: () => void;
   existingNomusIds?: string[];
 }
 
 export const GeralForm: React.FC<GeralFormProps> = ({
   onAddItem,
-  operadorPadrao,
+  onSaveGeral,
+  operadorPadrao = 'Operador Metalrib',
   autoImprimirAoSalvar,
   onOpenPrintModal,
+  onPrintGeralItem,
   catalog = [],
+  productCatalog = [],
   onOpenCatalog,
+  onOpenCatalogModal,
   onSaveToCatalog,
   prefilledItem,
+  prefilledProductItem,
+  onClearPrefilledProduct,
   existingNomusIds = []
 }) => {
+  const activeCatalog = catalog.length > 0 ? catalog : (productCatalog || []);
+  const handleSave = onSaveGeral || onAddItem;
+  const handleOpenCatalogView = onOpenCatalogModal || onOpenCatalog || (() => {});
+  const handlePrintModal = onPrintGeralItem || onOpenPrintModal;
+  const activePrefilled = prefilledProductItem || prefilledItem || null;
   const [codigoItem, setCodigoItem] = useState('');
   const [descricaoItem, setDescricaoItem] = useState('');
   const [idNomus, setIdNomus] = useState('');
@@ -82,12 +99,15 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Respond to prefilledItem if passed from catalog selection
+  // Respond to activePrefilled if passed from catalog selection
   useEffect(() => {
-    if (prefilledItem) {
-      applyCatalogItem(prefilledItem);
+    if (activePrefilled) {
+      applyCatalogItem(activePrefilled);
+      if (onClearPrefilledProduct) {
+        onClearPrefilledProduct();
+      }
     }
-  }, [prefilledItem]);
+  }, [activePrefilled]);
 
   // Handle outside click for suggestions dropdown
   useEffect(() => {
@@ -148,7 +168,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     setShowSuggestions(true);
 
     // Try finding exact or matching item
-    const match = findCatalogProductByCode(val) || catalog.find(p => p.codigo.toLowerCase() === val.toLowerCase().trim());
+    const match = findCatalogProductByCode(val, activeCatalog) || activeCatalog.find(p => (p.codigo || '').toLowerCase() === val.toLowerCase().trim());
     if (match) {
       setDescricaoItem(match.descricao);
       if (match.unidade) setUnidade(match.unidade);
@@ -160,12 +180,13 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   };
 
   // Filter suggestions from catalog
-  const filteredSuggestions = catalog.filter(p => {
+  const filteredSuggestions = (activeCatalog || []).filter(p => {
+    if (!p) return false;
     const term = codigoItem.toLowerCase().trim();
     if (!term) return false;
     return (
-      p.codigo.toLowerCase().includes(term) ||
-      p.descricao.toLowerCase().includes(term)
+      (p.codigo && p.codigo.toLowerCase().includes(term)) ||
+      (p.descricao && p.descricao.toLowerCase().includes(term))
     );
   }).slice(0, 6);
 
@@ -201,7 +222,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     try {
       // 1. If option enabled and item is not in catalog yet, auto-save to catalog database
       if (saveToCatalogCheck && onSaveToCatalog) {
-        const existing = catalog.find(p => p.codigo.toUpperCase() === finalCodigo);
+        const existing = (activeCatalog || []).find(p => (p.codigo || '').toUpperCase() === finalCodigo);
         if (!existing) {
           await onSaveToCatalog({
             codigo: finalCodigo,
@@ -224,20 +245,23 @@ export const GeralForm: React.FC<GeralFormProps> = ({
       }
 
       // 2. Add Item to Inventory
-      const newItem = await onAddItem({
-        id_nomus: finalIdNomus,
-        codigo_item: finalCodigo,
-        descricao_item: finalDescricao,
-        comprimento_mm: compNum,
-        largura_mm: largNum,
-        espessura_mm: Number(espessuraMm) || 0,
-        quantidade: finalQuantidade,
-        unidade,
-        operador: operador.trim() || operadorPadrao || 'Operador Produção'
-      });
+      let newItem: any = null;
+      if (handleSave) {
+        newItem = await handleSave({
+          id_nomus: finalIdNomus,
+          codigo_item: finalCodigo,
+          descricao_item: finalDescricao,
+          comprimento_mm: compNum,
+          largura_mm: largNum,
+          espessura_mm: Number(espessuraMm) || 0,
+          quantidade: finalQuantidade,
+          unidade,
+          operador: operador.trim() || operadorPadrao || 'Operador Produção'
+        });
+      }
 
-      if (autoImprimirAoSalvar && onOpenPrintModal && newItem) {
-        onOpenPrintModal(newItem);
+      if (autoImprimirAoSalvar && handlePrintModal && newItem) {
+        handlePrintModal(newItem);
       }
 
       // 3. Smart Reset according to workflow options:
@@ -302,17 +326,15 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {onOpenCatalog && (
-            <button
-              type="button"
-              onClick={onOpenCatalog}
-              className="bg-slate-100 hover:bg-slate-200 text-[#1b367c] text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Abrir e gerenciar base de dados do catálogo de produtos"
-            >
-              <BookOpen size={15} />
-              <span>Consultar Catálogo</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleOpenCatalogView}
+            className="bg-slate-100 hover:bg-slate-200 text-[#1b367c] text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Abrir e gerenciar base de dados do catálogo de produtos"
+          >
+            <BookOpen size={15} />
+            <span>Consultar Catálogo</span>
+          </button>
         </div>
       </div>
 

@@ -4,24 +4,40 @@ import { BumperItem, FilterState } from '../types';
 import { exportBumpersXLSX } from '../services/exporter';
 
 interface BumperTableProps {
-  bumpers: BumperItem[];
-  onRefresh: () => void;
-  onPrintLabel: (item: BumperItem) => void;
-  onPrintBatchLabels: (items: BumperItem[]) => void;
-  onEditItem: (item: BumperItem) => void;
-  onDeleteItem: (id: string | number) => void;
-  onClearAll: () => void;
+  bumpers?: BumperItem[];
+  onRefresh?: () => void;
+  onPrintLabel?: (item: BumperItem) => void;
+  onPrintSingle?: (item: BumperItem) => void;
+  onPrintBatchLabels?: (items: BumperItem[]) => void;
+  onPrintBatch?: (items: BumperItem[]) => void;
+  onEditItem?: (item: BumperItem) => void;
+  onEditBumper?: (item: BumperItem) => void;
+  onDeleteItem?: (id: string | number) => void;
+  onDeleteBumper?: (id: string | number) => void;
+  onClearAll?: () => void;
+  onClearBumpers?: () => void;
 }
 
 export const BumperTable: React.FC<BumperTableProps> = ({
-  bumpers,
+  bumpers = [],
   onRefresh,
   onPrintLabel,
+  onPrintSingle,
   onPrintBatchLabels,
+  onPrintBatch,
   onEditItem,
+  onEditBumper,
   onDeleteItem,
-  onClearAll
+  onDeleteBumper,
+  onClearAll,
+  onClearBumpers
 }) => {
+  const handlePrintSingle = onPrintSingle || onPrintLabel || (() => {});
+  const handlePrintBatch = onPrintBatch || onPrintBatchLabels || (() => {});
+  const handleEdit = onEditBumper || onEditItem || (() => {});
+  const handleDelete = onDeleteBumper || onDeleteItem || (() => {});
+  const handleClear = onClearBumpers || onClearAll || (() => {});
+
   const [filter, setFilter] = useState<FilterState>({
     search: '',
     minMedida: '',
@@ -32,13 +48,16 @@ export const BumperTable: React.FC<BumperTableProps> = ({
 
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
 
+  const safeBumpers = bumpers || [];
+
   // Filtering & Sorting
-  const filtered = bumpers.filter(item => {
+  const filtered = safeBumpers.filter(item => {
+    if (!item) return false;
     const q = filter.search.toLowerCase();
     const matchesSearch =
       !q ||
-      item.codigo.toLowerCase().includes(q) ||
-      item.tipo.toLowerCase().includes(q);
+      (item.codigo && item.codigo.toLowerCase().includes(q)) ||
+      (item.tipo && item.tipo.toLowerCase().includes(q));
 
     return matchesSearch;
   });
@@ -58,8 +77,8 @@ export const BumperTable: React.FC<BumperTableProps> = ({
   });
 
   // Calculate totals
-  const totalQty = bumpers.reduce((acc, b) => acc + b.quantidade, 0);
-  const totalMeters = bumpers.reduce((acc, b) => acc + (b.medida_mm * b.quantidade) / 1000, 0);
+  const totalQty = safeBumpers.reduce((acc, b) => acc + (b.quantidade || 0), 0);
+  const totalMeters = safeBumpers.reduce((acc, b) => acc + ((b.medida_mm || 0) * (b.quantidade || 0)) / 1000, 0);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === sorted.length) {
@@ -78,12 +97,12 @@ export const BumperTable: React.FC<BumperTableProps> = ({
   };
 
   const handlePrintSelected = () => {
-    const itemsToPrint = bumpers.filter(b => selectedIds.includes(b.id));
+    const itemsToPrint = safeBumpers.filter(b => selectedIds.includes(b.id));
     if (itemsToPrint.length === 0) {
       alert("Selecione ao menos um bumper da lista.");
       return;
     }
-    onPrintBatchLabels(itemsToPrint);
+    handlePrintBatch(itemsToPrint);
   };
 
   return (
@@ -92,7 +111,7 @@ export const BumperTable: React.FC<BumperTableProps> = ({
       <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
         <div>
           <div className="text-xl font-extrabold text-[#1b367c]">
-            {bumpers.length}
+            {safeBumpers.length}
           </div>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
             Linhas Registradas
@@ -114,14 +133,16 @@ export const BumperTable: React.FC<BumperTableProps> = ({
           Bumpers Cadastrados
         </h2>
 
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5"
-        >
-          <RefreshCw size={14} />
-          <span>Sincronizar</span>
-        </button>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5"
+          >
+            <RefreshCw size={14} />
+            <span>Sincronizar</span>
+          </button>
+        )}
       </div>
 
       {/* Filter */}
@@ -229,7 +250,7 @@ export const BumperTable: React.FC<BumperTableProps> = ({
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
-                          onClick={() => onPrintLabel(item)}
+                          onClick={() => handlePrintSingle(item)}
                           className="bg-sky-50 hover:bg-sky-100 text-sky-700 p-1.5 rounded-md transition-colors"
                           title="Imprimir Etiqueta Térmica"
                         >
@@ -237,7 +258,7 @@ export const BumperTable: React.FC<BumperTableProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => onEditItem(item)}
+                          onClick={() => handleEdit(item)}
                           className="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded-md transition-colors"
                           title="Editar Bumper"
                         >
@@ -247,7 +268,7 @@ export const BumperTable: React.FC<BumperTableProps> = ({
                           type="button"
                           onClick={() => {
                             if (confirm(`Excluir bumper ${item.codigo}?`)) {
-                              onDeleteItem(item.id);
+                              handleDelete(item.id);
                             }
                           }}
                           className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors"
@@ -281,8 +302,8 @@ export const BumperTable: React.FC<BumperTableProps> = ({
 
           <button
             type="button"
-            onClick={() => onPrintBatchLabels(bumpers)}
-            disabled={bumpers.length === 0}
+            onClick={() => handlePrintBatch(safeBumpers)}
+            disabled={safeBumpers.length === 0}
             className="bg-[#1b367c] hover:bg-[#13275b] text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <Printer size={15} />
@@ -293,8 +314,8 @@ export const BumperTable: React.FC<BumperTableProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => exportBumpersXLSX(bumpers)}
-            disabled={bumpers.length === 0}
+            onClick={() => exportBumpersXLSX(safeBumpers)}
+            disabled={safeBumpers.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-initial"
           >
             <FileSpreadsheet size={15} />
@@ -305,10 +326,10 @@ export const BumperTable: React.FC<BumperTableProps> = ({
             type="button"
             onClick={() => {
               if (confirm("Tem certeza que deseja apagar TODOS os bumpers salvos?")) {
-                onClearAll();
+                handleClear();
               }
             }}
-            disabled={bumpers.length === 0}
+            disabled={safeBumpers.length === 0}
             className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50"
             title="Limpar todos os bumpers"
           >

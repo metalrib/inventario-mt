@@ -4,8 +4,8 @@ import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem } from '../types'
 import { exportBackupJSON, parseBackupJSON, exportAllToXLSX } from '../services/exporter';
 
 interface BackupBarProps {
-  perfis: PerfilItem[];
-  bumpers: BumperItem[];
+  perfis?: PerfilItem[];
+  bumpers?: BumperItem[];
   gerais?: GeralItem[];
   productCatalog?: ProductCatalogItem[];
   onRestoredBackup: (
@@ -18,8 +18,8 @@ interface BackupBarProps {
 }
 
 export const BackupBar: React.FC<BackupBarProps> = ({
-  perfis,
-  bumpers,
+  perfis = [],
+  bumpers = [],
   gerais = [],
   productCatalog = [],
   onRestoredBackup,
@@ -27,20 +27,25 @@ export const BackupBar: React.FC<BackupBarProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const safePerfis = perfis || [];
+  const safeBumpers = bumpers || [];
+  const safeGerais = gerais || [];
+  const safeCatalog = productCatalog || [];
+
   const handleExportJSON = () => {
-    if (perfis.length === 0 && bumpers.length === 0 && gerais.length === 0 && productCatalog.length === 0) {
+    if (safePerfis.length === 0 && safeBumpers.length === 0 && safeGerais.length === 0 && safeCatalog.length === 0) {
       alert("Não há registros cadastrados para gerar backup.");
       return;
     }
-    exportBackupJSON(perfis, bumpers, gerais, productCatalog);
+    exportBackupJSON(safePerfis, safeBumpers, safeGerais, safeCatalog);
   };
 
   const handleExportExcelAll = () => {
-    if (perfis.length === 0 && bumpers.length === 0 && gerais.length === 0) {
+    if (safePerfis.length === 0 && safeBumpers.length === 0 && safeGerais.length === 0) {
       alert("Não há registros cadastrados para exportar para Excel.");
       return;
     }
-    exportAllToXLSX(perfis, bumpers, gerais);
+    exportAllToXLSX(safePerfis, safeBumpers, safeGerais);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

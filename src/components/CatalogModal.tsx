@@ -6,25 +6,32 @@ import { ProfileCatalogItem } from '../types';
 interface CatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectProfile: (item: ProfileCatalogItem) => void;
+  onSelectProfile?: (item: ProfileCatalogItem) => void;
+  onSelectPerfil?: (item: ProfileCatalogItem) => void;
 }
 
 export const CatalogModal: React.FC<CatalogModalProps> = ({
   isOpen,
   onClose,
-  onSelectProfile
+  onSelectProfile,
+  onSelectPerfil
 }) => {
+  const handleSelect = onSelectPerfil || onSelectProfile || (() => {});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
   if (!isOpen) return null;
 
-  const categories = ['Todos', ...Array.from(new Set(CATALOGO_PERFIS.map(p => p.categoria)))];
+  const safeProfiles = CATALOGO_PERFIS || [];
+  const categories = ['Todos', ...Array.from(new Set(safeProfiles.map(p => p.categoria)))];
 
-  const filtered = CATALOGO_PERFIS.filter(item => {
+  const filtered = safeProfiles.filter(item => {
+    if (!item) return false;
+    const q = searchTerm.toLowerCase().trim();
     const matchesSearch =
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.desc.toLowerCase().includes(searchTerm.toLowerCase());
+      !q ||
+      (item.code && item.code.toLowerCase().includes(q)) ||
+      (item.desc && item.desc.toLowerCase().includes(q));
     const matchesCategory = selectedCategory === 'Todos' || item.categoria === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -95,7 +102,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
               <div
                 key={item.code}
                 onClick={() => {
-                  onSelectProfile(item);
+                  handleSelect(item);
                   onClose();
                 }}
                 className="bg-white border-2 border-slate-200 hover:border-[#1b367c] rounded-xl p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition-all group"

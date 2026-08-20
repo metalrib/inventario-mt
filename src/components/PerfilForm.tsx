@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Zap, ChevronDown, Plus, Minus, Check, Layers } from 'lucide-react';
 import { ProfileCatalogItem } from '../types';
-import { generateUniqueNomusId, formatNomusIdInput } from '../services/supabase';
+import { generateUniqueNomusId, formatNomusIdInput } from '../services/firebase';
 
 interface PerfilFormProps {
   onSavePerfil: (perfilData: {

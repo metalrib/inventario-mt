@@ -7,9 +7,9 @@ interface ScanResultModalProps {
   isOpen: boolean;
   onClose: () => void;
   scannedCode: string | null;
-  perfis: PerfilItem[];
-  bumpers: BumperItem[];
-  gerais: GeralItem[];
+  perfis?: PerfilItem[];
+  bumpers?: BumperItem[];
+  gerais?: GeralItem[];
   onAddPerfil: (item: Omit<PerfilItem, 'id'>) => Promise<void>;
   onAddBumper: (item: Omit<BumperItem, 'id'>) => Promise<void>;
   onAddGeral: (item: Omit<GeralItem, 'id'>) => Promise<void>;
@@ -74,9 +74,9 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   isOpen,
   onClose,
   scannedCode,
-  perfis,
-  bumpers,
-  gerais,
+  perfis = [],
+  bumpers = [],
+  gerais = [],
   onAddPerfil,
   onAddBumper,
   onAddGeral,
@@ -92,6 +92,10 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   const [quantidadeInput, setQuantidadeInput] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
+  const safePerfis = perfis || [];
+  const safeBumpers = bumpers || [];
+  const safeGerais = gerais || [];
 
   const { idNomus, codigoItem, descItem, medidaMm, categoriaHint } = parseScannedPayload(scannedCode || '');
 
@@ -145,13 +149,13 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   let existingGeral: GeralItem | undefined;
 
   if (idNomus) {
-    existingPerfil = perfis.find(p => p.id_nomus === idNomus);
-    existingBumper = bumpers.find(b => b.id_nomus === idNomus);
-    existingGeral = gerais.find(g => g.id_nomus === idNomus);
+    existingPerfil = safePerfis.find(p => p.id_nomus === idNomus);
+    existingBumper = safeBumpers.find(b => b.id_nomus === idNomus);
+    existingGeral = safeGerais.find(g => g.id_nomus === idNomus);
   } else if (codigoItem) {
-    existingPerfil = perfis.find(p => p.codigo_perfil === codigoItem);
-    existingBumper = bumpers.find(b => b.codigo === codigoItem);
-    existingGeral = gerais.find(g => g.codigo_item === codigoItem);
+    existingPerfil = safePerfis.find(p => p.codigo_perfil === codigoItem);
+    existingBumper = safeBumpers.find(b => b.codigo === codigoItem);
+    existingGeral = safeGerais.find(g => g.codigo_item === codigoItem);
   }
 
   const existingItem = existingPerfil || existingBumper || existingGeral;

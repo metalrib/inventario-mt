@@ -4,24 +4,40 @@ import { PerfilItem, FilterState } from '../types';
 import { exportPerfisCSV, exportPerfisXLSX } from '../services/exporter';
 
 interface PerfilTableProps {
-  perfis: PerfilItem[];
-  onRefresh: () => void;
-  onPrintLabel: (item: PerfilItem) => void;
-  onPrintBatchLabels: (items: PerfilItem[]) => void;
-  onEditItem: (item: PerfilItem) => void;
-  onDeleteItem: (id: string | number) => void;
-  onClearAll: () => void;
+  perfis?: PerfilItem[];
+  onRefresh?: () => void;
+  onPrintLabel?: (item: PerfilItem) => void;
+  onPrintSingle?: (item: PerfilItem) => void;
+  onPrintBatchLabels?: (items: PerfilItem[]) => void;
+  onPrintBatch?: (items: PerfilItem[]) => void;
+  onEditItem?: (item: PerfilItem) => void;
+  onEditPerfil?: (item: PerfilItem) => void;
+  onDeleteItem?: (id: string | number) => void;
+  onDeletePerfil?: (id: string | number) => void;
+  onClearAll?: () => void;
+  onClearPerfis?: () => void;
 }
 
 export const PerfilTable: React.FC<PerfilTableProps> = ({
-  perfis,
+  perfis = [],
   onRefresh,
   onPrintLabel,
+  onPrintSingle,
   onPrintBatchLabels,
+  onPrintBatch,
   onEditItem,
+  onEditPerfil,
   onDeleteItem,
-  onClearAll
+  onDeletePerfil,
+  onClearAll,
+  onClearPerfis
 }) => {
+  const handlePrintSingle = onPrintSingle || onPrintLabel || (() => {});
+  const handlePrintBatch = onPrintBatch || onPrintBatchLabels || (() => {});
+  const handleEdit = onEditPerfil || onEditItem || (() => {});
+  const handleDelete = onDeletePerfil || onDeleteItem || (() => {});
+  const handleClear = onClearPerfis || onClearAll || (() => {});
+
   const [filter, setFilter] = useState<FilterState>({
     search: '',
     minMedida: '',
@@ -32,14 +48,17 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
 
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
 
+  const safePerfis = perfis || [];
+
   // Filtering & Sorting
-  const filtered = perfis.filter(item => {
+  const filtered = safePerfis.filter(item => {
+    if (!item) return false;
     const q = filter.search.toLowerCase();
     const matchesSearch =
       !q ||
-      item.id_nomus.toLowerCase().includes(q) ||
-      item.codigo_perfil.toLowerCase().includes(q) ||
-      item.descricao_perfil.toLowerCase().includes(q);
+      (item.id_nomus && item.id_nomus.toLowerCase().includes(q)) ||
+      (item.codigo_perfil && item.codigo_perfil.toLowerCase().includes(q)) ||
+      (item.descricao_perfil && item.descricao_perfil.toLowerCase().includes(q));
 
     const min = filter.minMedida ? parseInt(filter.minMedida) : 0;
     const max = filter.maxMedida ? parseInt(filter.maxMedida) : Infinity;
@@ -64,8 +83,8 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
   });
 
   // Calculate totals
-  const totalMeters = perfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
-  const totalQty = perfis.reduce((acc, p) => acc + p.quantidade, 0);
+  const totalMeters = safePerfis.reduce((acc, p) => acc + (p.medida_mm * p.quantidade) / 1000, 0);
+  const totalQty = safePerfis.reduce((acc, p) => acc + p.quantidade, 0);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === sorted.length) {
@@ -84,12 +103,12 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
   };
 
   const handlePrintSelected = () => {
-    const itemsToPrint = perfis.filter(p => selectedIds.includes(p.id));
+    const itemsToPrint = safePerfis.filter(p => selectedIds.includes(p.id));
     if (itemsToPrint.length === 0) {
       alert("Selecione ao menos um item da tabela.");
       return;
     }
-    onPrintBatchLabels(itemsToPrint);
+    handlePrintBatch(itemsToPrint);
   };
 
   return (
@@ -100,7 +119,7 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
           <h2 className="font-extrabold text-base text-[#1b367c] flex items-center gap-2">
             <span>Retalhos Coletados</span>
             <span className="text-xs font-bold px-2.5 py-0.5 bg-blue-100 text-[#1b367c] rounded-full">
-              {perfis.length} registros
+              {safePerfis.length} registros
             </span>
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -108,14 +127,16 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5"
-        >
-          <RefreshCw size={14} />
-          <span>Sincronizar</span>
-        </button>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5"
+          >
+            <RefreshCw size={14} />
+            <span>Sincronizar</span>
+          </button>
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -227,7 +248,7 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
-                          onClick={() => onPrintLabel(item)}
+                          onClick={() => handlePrintSingle(item)}
                           className="bg-sky-50 hover:bg-sky-100 text-sky-700 p-1.5 rounded-md transition-colors"
                           title="Imprimir Etiqueta Térmica"
                         >
@@ -235,7 +256,7 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => onEditItem(item)}
+                          onClick={() => handleEdit(item)}
                           className="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded-md transition-colors"
                           title="Editar Registro"
                         >
@@ -245,7 +266,7 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                           type="button"
                           onClick={() => {
                             if (confirm(`Excluir perfil ${item.id_nomus}?`)) {
-                              onDeleteItem(item.id);
+                              handleDelete(item.id);
                             }
                           }}
                           className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors"
@@ -279,8 +300,8 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
 
           <button
             type="button"
-            onClick={() => onPrintBatchLabels(perfis)}
-            disabled={perfis.length === 0}
+            onClick={() => handlePrintBatch(safePerfis)}
+            disabled={safePerfis.length === 0}
             className="bg-[#1b367c] hover:bg-[#13275b] text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <Printer size={15} />
@@ -291,8 +312,8 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => exportPerfisXLSX(perfis)}
-            disabled={perfis.length === 0}
+            onClick={() => exportPerfisXLSX(safePerfis)}
+            disabled={safePerfis.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-initial"
             title="Exportar retalhos de perfis para arquivo Excel (.xlsx)"
           >
@@ -304,10 +325,10 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
             type="button"
             onClick={() => {
               if (confirm("Tem certeza que deseja apagar TODOS os retalhos coletados?")) {
-                onClearAll();
+                handleClear();
               }
             }}
-            disabled={perfis.length === 0}
+            disabled={safePerfis.length === 0}
             className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50"
             title="Limpar todos da lista"
           >

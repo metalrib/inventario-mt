@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Shield, Zap } from 'lucide-react';
 import { BumperType } from '../types';
-import { generateUniqueNomusId } from '../services/supabase';
+import { generateUniqueNomusId } from '../services/firebase';
 
 interface BumperFormProps {
   onSaveBumper: (bumperData: {

@@ -1,6 +1,6 @@
 {
   "name": "Metalrib - Inventário Produção",
-  "description": "Sistema de Inventário Produção para Controle de Estoque, Chapas, Insumos, Perfis, Retalhos e Bumpers com Catálogo de Produtos, Autopreenchimento por Código, Impressão de Etiquetas e Sincronização Supabase",
+  "description": "Sistema de Inventário Produção para Controle de Estoque, Chapas, Insumos, Perfis, Retalhos e Bumpers com Catálogo de Produtos, Autopreenchimento por Código, Impressão de Etiquetas Térmicas e Sincronização em Tempo Real via Firebase Firestore",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
