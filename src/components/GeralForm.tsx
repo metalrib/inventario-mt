@@ -69,18 +69,22 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const comprimentoInputRef = useRef<HTMLInputElement>(null);
   const codigoInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-generate ID on mount if active and empty
+  // Auto-generate ID on mount if active or if current ID is already taken
   useEffect(() => {
-    if (autoGerarId && !idNomus) {
-      setIdNomus(generateUniqueNomusId(existingNomusIds));
+    if (autoGerarId) {
+      if (!idNomus || existingNomusIds.includes(idNomus.trim())) {
+        setIdNomus(generateUniqueNomusId(existingNomusIds, idNomus));
+      }
     }
   }, [autoGerarId, existingNomusIds]);
 
   const handleToggleAutoGerarId = (val: boolean) => {
     setAutoGerarId(val);
     localStorage.setItem('metalrib_auto_gerar_id', String(val));
-    if (val && !idNomus) {
-      setIdNomus(generateUniqueNomusId(existingNomusIds));
+    if (val) {
+      if (!idNomus || existingNomusIds.includes(idNomus.trim())) {
+        setIdNomus(generateUniqueNomusId(existingNomusIds, idNomus));
+      }
     }
   };
 
@@ -293,7 +297,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
 
       // If auto-generate ID is active, generate next ID automatically!
       if (autoGerarId) {
-        setIdNomus(generateUniqueNomusId(existingNomusIds));
+        const nextId = generateUniqueNomusId([finalIdNomus, ...existingNomusIds]);
+        setIdNomus(nextId);
       } else {
         setIdNomus('');
       }

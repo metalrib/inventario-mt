@@ -36,8 +36,8 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
-    if (!idNomus) {
-      setIdNomus(generateUniqueNomusId(existingNomusIds));
+    if (!idNomus || (idNomus && existingNomusIds.includes(idNomus.trim()))) {
+      setIdNomus(generateUniqueNomusId(existingNomusIds, idNomus));
     }
   }, [existingNomusIds]);
 
@@ -85,8 +85,8 @@ export const PerfilForm: React.FC<PerfilFormProps> = ({
         operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
-      // Reset form & generate next ID
-      setIdNomus(generateUniqueNomusId(existingNomusIds));
+      // Reset form & generate next unique ID using the freshly saved finalId
+      setIdNomus(generateUniqueNomusId([finalId, ...existingNomusIds]));
       if (!manterMedidaPerfis) {
         setMedidaMm('');
       }

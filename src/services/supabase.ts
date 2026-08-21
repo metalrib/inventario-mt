@@ -201,22 +201,82 @@ export function saveLocalBumpers(items: BumperItem[]) {
   localStorage.setItem('metalrib_bumpers', JSON.stringify(items));
 }
 
+// Set to keep track of recently generated / reserved IDs in this session
+const recentlyUsedIds = new Set<string>();
+
+export function registerUsedNomusId(id: string): void {
+  if (!id) return;
+  const clean = id.trim();
+  if (clean) {
+    recentlyUsedIds.add(clean);
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
+      if (Array.isArray(stored) && !stored.includes(clean)) {
+        stored.push(clean);
+        if (stored.length > 500) stored.shift();
+        sessionStorage.setItem('metalrib_reserved_ids', JSON.stringify(stored));
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
+export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
+  const ids = new Set<string>();
+
+  for (const id of extraIds) {
+    if (id && id.trim()) ids.add(id.trim());
+  }
+
+  for (const id of recentlyUsedIds) {
+    if (id && id.trim()) ids.add(id.trim());
+  }
+
+  try {
+    const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
+    if (Array.isArray(stored)) {
+      for (const id of stored) {
+        if (id && typeof id === 'string') ids.add(id.trim());
+      }
+    }
+  } catch {}
+
+  try {
+    const perfis = getLocalPerfis();
+    for (const p of perfis) {
+      if (p.id_nomus) ids.add(p.id_nomus.trim());
+    }
+    const bumpers = getLocalBumpers();
+    for (const b of bumpers) {
+      if (b.id_nomus) ids.add(b.id_nomus.trim());
+      if (b.tipo === 'ID' && b.codigo) ids.add(b.codigo.trim());
+    }
+    const gerais = getLocalGerais();
+    for (const g of gerais) {
+      if (g.id_nomus) ids.add(g.id_nomus.trim());
+    }
+  } catch {}
+
+  return ids;
+}
+
 /**
  * Generates the next sequential, unique Nomus ID in the format YYYY.MM.DD.HHMM
  * Checks against all existing IDs in the system and avoids duplicates,
  * incrementing minutes if the timestamp already exists or was just generated.
  */
 export function generateUniqueNomusId(existingIds: string[] = [], currentId?: string): string {
+  const idsToAvoid = getAllKnownNomusIds(existingIds);
+  if (currentId && currentId.trim()) {
+    idsToAvoid.add(currentId.trim());
+  }
+
   const d = new Date();
   d.setSeconds(0, 0);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
-
-  const idsToAvoid = new Set(existingIds.map(id => id ? id.trim() : '').filter(Boolean));
-  if (currentId && currentId.trim()) {
-    idsToAvoid.add(currentId.trim());
-  }
 
   let minutesToAdd = 0;
   while (idsToAvoid.has(base)) {
@@ -224,6 +284,8 @@ export function generateUniqueNomusId(existingIds: string[] = [], currentId?: st
     const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
     base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
   }
+
+  registerUsedNomusId(base);
 
   return base;
 }

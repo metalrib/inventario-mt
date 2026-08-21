@@ -251,6 +251,9 @@ export async function addPerfil(item: Omit<PerfilItem, 'id' | 'created_at'> & { 
 
   // Salva no Firestore
   try {
+    if (fullItem.id_nomus) {
+      registerUsedNomusId(fullItem.id_nomus);
+    }
     await setDoc(doc(db, COL_PERFIS, docId), {
       id_nomus: fullItem.id_nomus,
       codigo_perfil: fullItem.codigo_perfil,
@@ -324,6 +327,11 @@ export async function addBumper(item: Omit<BumperItem, 'id' | 'created_at'> & { 
   };
 
   try {
+    if (fullItem.id_nomus) {
+      registerUsedNomusId(fullItem.id_nomus);
+    } else if (fullItem.tipo === 'ID' && fullItem.codigo) {
+      registerUsedNomusId(fullItem.codigo);
+    }
     await setDoc(doc(db, COL_BUMPERS, docId), {
       tipo: fullItem.tipo,
       codigo: fullItem.codigo,
@@ -395,6 +403,9 @@ export async function addGeral(item: Omit<GeralItem, 'id' | 'created_at'> & { cr
   };
 
   try {
+    if (fullItem.id_nomus) {
+      registerUsedNomusId(fullItem.id_nomus);
+    }
     await setDoc(doc(db, COL_GERAIS, docId), {
       id_nomus: fullItem.id_nomus,
       codigo_item: fullItem.codigo_item,
@@ -613,17 +624,81 @@ export async function syncAllToFirebase(
 
 // ----------------- NOMUS ID & CATALOG HELPERS -----------------
 
+// Set to keep track of recently generated / reserved IDs in this session
+const recentlyUsedIds = new Set<string>();
+
+export function registerUsedNomusId(id: string): void {
+  if (!id) return;
+  const clean = id.trim();
+  if (clean) {
+    recentlyUsedIds.add(clean);
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
+      if (Array.isArray(stored) && !stored.includes(clean)) {
+        stored.push(clean);
+        if (stored.length > 500) stored.shift();
+        sessionStorage.setItem('metalrib_reserved_ids', JSON.stringify(stored));
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
+export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
+  const ids = new Set<string>();
+
+  // 1. Extra IDs passed as arguments
+  for (const id of extraIds) {
+    if (id && id.trim()) ids.add(id.trim());
+  }
+
+  // 2. In-memory recently used IDs
+  for (const id of recentlyUsedIds) {
+    if (id && id.trim()) ids.add(id.trim());
+  }
+
+  // 3. SessionStorage reserved IDs
+  try {
+    const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
+    if (Array.isArray(stored)) {
+      for (const id of stored) {
+        if (id && typeof id === 'string') ids.add(id.trim());
+      }
+    }
+  } catch {}
+
+  // 4. LocalStorage collections
+  try {
+    const perfis = getLocalPerfis();
+    for (const p of perfis) {
+      if (p.id_nomus) ids.add(p.id_nomus.trim());
+    }
+    const bumpers = getLocalBumpers();
+    for (const b of bumpers) {
+      if (b.id_nomus) ids.add(b.id_nomus.trim());
+      if (b.tipo === 'ID' && b.codigo) ids.add(b.codigo.trim());
+    }
+    const gerais = getLocalGerais();
+    for (const g of gerais) {
+      if (g.id_nomus) ids.add(g.id_nomus.trim());
+    }
+  } catch {}
+
+  return ids;
+}
+
 export function generateUniqueNomusId(existingIds: string[] = [], currentId?: string): string {
+  const idsToAvoid = getAllKnownNomusIds(existingIds);
+  if (currentId && currentId.trim()) {
+    idsToAvoid.add(currentId.trim());
+  }
+
   const d = new Date();
   d.setSeconds(0, 0);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   let base = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}.${pad(d.getHours())}${pad(d.getMinutes())}`;
-
-  const idsToAvoid = new Set(existingIds.map(id => id ? id.trim() : '').filter(Boolean));
-  if (currentId && currentId.trim()) {
-    idsToAvoid.add(currentId.trim());
-  }
 
   let minutesToAdd = 0;
   while (idsToAvoid.has(base)) {
@@ -631,6 +706,9 @@ export function generateUniqueNomusId(existingIds: string[] = [], currentId?: st
     const nextDate = new Date(d.getTime() + minutesToAdd * 60000);
     base = `${nextDate.getFullYear()}.${pad(nextDate.getMonth() + 1)}.${pad(nextDate.getDate())}.${pad(nextDate.getHours())}${pad(nextDate.getMinutes())}`;
   }
+
+  // Immediately register this generated ID in session cache so rapid subsequent calls get the next minute
+  registerUsedNomusId(base);
 
   return base;
 }

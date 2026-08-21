@@ -33,8 +33,8 @@ export const BumperForm: React.FC<BumperFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
-    if (bumperType === 'ID' && !codigo) {
-      setCodigo(generateUniqueNomusId(existingNomusIds));
+    if (bumperType === 'ID' && (!codigo || (codigo && existingNomusIds.includes(codigo.trim())))) {
+      setCodigo(generateUniqueNomusId(existingNomusIds, codigo));
     }
   }, [bumperType, existingNomusIds]);
 
@@ -98,17 +98,18 @@ export const BumperForm: React.FC<BumperFormProps> = ({
 
     setIsSaving(true);
     try {
+      const savedCodigo = codigo.trim();
       await onSaveBumper({
         tipo: bumperType,
-        codigo: codigo.trim(),
-        id_nomus: bumperType === 'ID' ? codigo.trim() : undefined,
+        codigo: savedCodigo,
+        id_nomus: bumperType === 'ID' ? savedCodigo : undefined,
         medida_mm: parseInt(medidaMm),
         quantidade: quantidade,
         operador: operador.trim() || operadorPadrao || 'Operador Produção'
       });
 
       if (bumperType === 'ID') {
-        setCodigo(generateUniqueNomusId(existingNomusIds));
+        setCodigo(generateUniqueNomusId([savedCodigo, ...existingNomusIds]));
       } else {
         setCodigo('');
       }
