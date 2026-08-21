@@ -8,12 +8,13 @@ interface GeralTableProps {
   items?: GeralItem[];
   gerais?: GeralItem[];
   onRefresh?: () => void;
-  onDeleteItem: (id: string | number) => void;
-  onDeleteBatch?: (ids: (string | number)[]) => void;
-  onClearAll?: () => void;
-  onClearGerais?: () => void;
-  onUpdateItem?: (id: string | number, updated: Partial<GeralItem>) => void;
-  onEditGeral?: (id: string | number, updated: Partial<GeralItem>) => void;
+  onDeleteItem?: (id: string | number) => void | Promise<void>;
+  onDeleteGeral?: (id: string | number) => void | Promise<void>;
+  onDeleteBatch?: (ids: (string | number)[]) => void | Promise<void>;
+  onClearAll?: () => void | Promise<void>;
+  onClearGerais?: () => void | Promise<void>;
+  onUpdateItem?: (id: string | number, updated: Partial<GeralItem>) => void | Promise<void>;
+  onEditGeral?: (id: string | number, updated: Partial<GeralItem>) => void | Promise<void>;
   onOpenBatchPrint?: (items: GeralItem[]) => void;
   onPrintBatch?: (items: GeralItem[]) => void;
   onOpenSinglePrint?: (item: GeralItem) => void;
@@ -25,6 +26,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   gerais,
   onRefresh,
   onDeleteItem,
+  onDeleteGeral,
   onDeleteBatch,
   onClearAll,
   onClearGerais,
@@ -38,6 +40,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   const itemList = items || gerais || [];
   const handleClear = onClearAll || onClearGerais || (() => {});
   const handleUpdate = onUpdateItem || onEditGeral || (() => {});
+  const handleDelete = onDeleteGeral || onDeleteItem || (() => {});
   const handleBatchPrintCallback = onOpenBatchPrint || onPrintBatch || (() => {});
   const handleSinglePrintCallback = onOpenSinglePrint || onPrintSingle || (() => {});
 
@@ -152,7 +155,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         await onDeleteBatch(selectedIds);
       } else {
         for (const id of selectedIds) {
-          await onDeleteItem(id);
+          await handleDelete(id);
         }
       }
       setSelectedIds([]);
@@ -185,7 +188,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
     if (!itemToDelete) return;
     setIsDeleting(true);
     try {
-      await onDeleteItem(itemToDelete.id);
+      await handleDelete(itemToDelete.id);
       setItemToDelete(null);
     } catch (err) {
       console.error('Erro ao excluir item:', err);

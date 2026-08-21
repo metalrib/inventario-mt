@@ -470,7 +470,9 @@ export default function App() {
                   setIsEditModalOpen(true);
                 }}
                 onDeletePerfil={handleDeletePerfil}
+                onDeleteItem={handleDeletePerfil}
                 onClearPerfis={handleClearPerfis}
+                onClearAll={handleClearPerfis}
                 onPrintSingle={handlePrintSinglePerfil}
                 onPrintBatch={handlePrintBatchPerfis}
               />
@@ -502,7 +504,9 @@ export default function App() {
                   setIsEditModalOpen(true);
                 }}
                 onDeleteBumper={handleDeleteBumper}
+                onDeleteItem={handleDeleteBumper}
                 onClearBumpers={handleClearBumpers}
+                onClearAll={handleClearBumpers}
                 onPrintSingle={handlePrintSingleBumper}
                 onPrintBatch={handlePrintBatchBumpers}
               />
@@ -529,7 +533,9 @@ export default function App() {
                 gerais={gerais}
                 onEditGeral={handleEditGeral}
                 onDeleteGeral={handleDeleteGeral}
+                onDeleteItem={handleDeleteGeral}
                 onClearGerais={handleClearGerais}
+                onClearAll={handleClearGerais}
                 onPrintSingle={handlePrintSingleGeral}
                 onPrintBatch={handlePrintBatchGerais}
                 onDeleteBatch={handleDeleteBatchGerais}
