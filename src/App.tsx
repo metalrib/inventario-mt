@@ -395,7 +395,7 @@ export default function App() {
   ].map(id => (id || '').trim()).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-3 md:p-4 max-w-7xl mx-auto font-sans w-full box-border">
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 sm:p-3 md:p-5 lg:p-6 max-w-[1850px] mx-auto font-sans w-full box-border">
       {/* App Header */}
       <Header
         isOnline={isOnline}
@@ -434,8 +434,8 @@ export default function App() {
       {/* Main Tab Views */}
       <main className="w-full">
         {activeTab === 'perfis' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
-            <div className="md:col-span-5 xl:col-span-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
+            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
               <PerfilForm
                 onSavePerfil={handleSavePerfil}
                 onOpenCatalog={() => setIsCatalogOpen(true)}
@@ -450,7 +450,7 @@ export default function App() {
                 operadorPadrao={config.operadorPadrao}
               />
             </div>
-            <div className="md:col-span-7 xl:col-span-8">
+            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
               <PerfilTable
                 perfis={perfis}
                 onEditPerfil={(item) => {
@@ -468,8 +468,8 @@ export default function App() {
         )}
 
         {activeTab === 'bumpers' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
-            <div className="md:col-span-5 xl:col-span-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
+            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
               <BumperForm
                 onSaveBumper={handleSaveBumper}
                 manterMedidaBumpers={config.manterMedidaBumpers}
@@ -482,7 +482,7 @@ export default function App() {
                 operadorPadrao={config.operadorPadrao}
               />
             </div>
-            <div className="md:col-span-7 xl:col-span-8">
+            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
               <BumperTable
                 bumpers={bumpers}
                 onEditBumper={(item) => {
@@ -500,8 +500,8 @@ export default function App() {
         )}
 
         {activeTab === 'gerais' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full">
-            <div className="md:col-span-5 xl:col-span-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
+            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
               <GeralForm
                 onSaveGeral={handleSaveGeral}
                 productCatalog={productCatalog}
@@ -513,7 +513,7 @@ export default function App() {
                 onPrintGeralItem={handlePrintSingleGeral}
               />
             </div>
-            <div className="md:col-span-7 xl:col-span-8">
+            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
               <GeralTable
                 gerais={gerais}
                 onEditGeral={handleEditGeral}

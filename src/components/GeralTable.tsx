@@ -280,10 +280,10 @@ export const GeralTable: React.FC<GeralTableProps> = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <div className="overflow-x-auto overflow-y-auto max-h-[650px] 2xl:max-h-[calc(100vh-290px)] rounded-xl border border-slate-200 shadow-xs">
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+          <thead className="sticky top-0 z-10 bg-slate-100 shadow-xs border-b-2 border-slate-200">
+            <tr className="text-[11px] font-black text-slate-600 uppercase tracking-wider">
               <th className="p-3 w-10 text-center">
                 <button
                   type="button"

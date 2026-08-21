@@ -175,7 +175,7 @@ export const BumperTable: React.FC<BumperTableProps> = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[420px] border border-slate-200 rounded-lg mb-3">
+      <div className="overflow-x-auto overflow-y-auto max-h-[620px] 2xl:max-h-[calc(100vh-290px)] border border-slate-200 rounded-lg mb-3 shadow-xs">
         <table className="w-full text-left border-collapse text-xs">
           <thead className="bg-slate-100 text-[#1b367c] font-black sticky top-0 z-10 border-b-2 border-slate-200">
             <tr>

@@ -134,8 +134,8 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Metrics & Action Controls */}
       <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full xl:w-auto">
-        {/* Metrics Quick Summary */}
-        <div className="hidden 2xl:flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
+        {/* Metrics Quick Summary - Visible on medium and desktop screens */}
+        <div className="hidden lg:flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600">
           <div>
             <span className="text-slate-400 block text-[10px] uppercase font-bold">Retalhos</span>
             <span className="text-sm font-extrabold text-[#1b367c]">{totalPerfisMeters.toFixed(1)}m</span>
