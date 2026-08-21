@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Printer, Trash2, Edit3, Download, RefreshCw, FileText, CheckSquare, Square, FileSpreadsheet } from 'lucide-react';
 import { PerfilItem, FilterState } from '../types';
 import { exportPerfisCSV, exportPerfisXLSX } from '../services/exporter';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface PerfilTableProps {
   perfis?: PerfilItem[];
@@ -47,6 +48,9 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
   });
 
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<PerfilItem | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const safePerfis = perfis || [];
 
@@ -264,12 +268,8 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Excluir perfil ${item.id_nomus}?`)) {
-                              handleDelete(item.id);
-                            }
-                          }}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors"
+                          onClick={() => setItemToDelete(item)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors cursor-pointer"
                           title="Excluir"
                         >
                           <Trash2 size={14} />
@@ -323,13 +323,9 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
 
           <button
             type="button"
-            onClick={() => {
-              if (confirm("Tem certeza que deseja apagar TODOS os retalhos coletados?")) {
-                handleClear();
-              }
-            }}
+            onClick={() => setIsClearAllModalOpen(true)}
             disabled={safePerfis.length === 0}
-            className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50"
+            className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50 cursor-pointer"
             title="Limpar todos da lista"
           >
             <Trash2 size={15} />
@@ -337,6 +333,48 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Deletion Modals */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(itemToDelete)}
+        title="Excluir Retalho de Perfil"
+        message="Tem certeza que deseja excluir este retalho de perfil do inventário?"
+        itemDescription={
+          itemToDelete
+            ? `${itemToDelete.codigo_perfil} - ${itemToDelete.descricao_perfil || 'Sem descrição'} (${itemToDelete.medida_mm} mm - ID: ${itemToDelete.id_nomus || 'S/N'})`
+            : undefined
+        }
+        onConfirm={async () => {
+          if (!itemToDelete) return;
+          setIsDeleting(true);
+          try {
+            await handleDelete(itemToDelete.id);
+            setItemToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+        isDeleting={isDeleting}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isClearAllModalOpen}
+        title="Limpar Todos os Retalhos"
+        message="ATENÇÃO: Deseja apagar TODOS os retalhos de perfil da lista? Esta ação removerá todos os registros permanentemente."
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            await handleClear();
+            setSelectedIds([]);
+            setIsClearAllModalOpen(false);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setIsClearAllModalOpen(false)}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

@@ -160,11 +160,14 @@ export default function App() {
   };
 
   const handleDeletePerfil = async (id: string | number) => {
+    setPerfis(prev => prev.filter(p => String(p.id) !== String(id)));
     await deletePerfil(id);
   };
 
   const handleClearPerfis = async () => {
-    for (const p of perfis) {
+    const itemsToDelete = [...perfis];
+    setPerfis([]);
+    for (const p of itemsToDelete) {
       await deletePerfil(p.id);
     }
   };
@@ -192,11 +195,14 @@ export default function App() {
   };
 
   const handleDeleteBumper = async (id: string | number) => {
+    setBumpers(prev => prev.filter(b => String(b.id) !== String(id)));
     await deleteBumper(id);
   };
 
   const handleClearBumpers = async () => {
-    for (const b of bumpers) {
+    const itemsToDelete = [...bumpers];
+    setBumpers([]);
+    for (const b of itemsToDelete) {
       await deleteBumper(b.id);
     }
   };
@@ -212,16 +218,21 @@ export default function App() {
   };
 
   const handleDeleteGeral = async (id: string | number) => {
+    setGerais(prev => prev.filter(g => String(g.id) !== String(id)));
     await deleteGeral(id);
   };
 
   const handleClearGerais = async () => {
-    for (const g of gerais) {
+    const itemsToDelete = [...gerais];
+    setGerais([]);
+    for (const g of itemsToDelete) {
       await deleteGeral(g.id);
     }
   };
 
   const handleDeleteBatchGerais = async (ids: (string | number)[]) => {
+    const stringIds = ids.map(String);
+    setGerais(prev => prev.filter(g => !stringIds.includes(String(g.id))));
     for (const id of ids) {
       await deleteGeral(id);
     }

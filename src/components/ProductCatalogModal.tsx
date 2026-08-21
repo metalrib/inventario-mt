@@ -16,6 +16,7 @@ import {
   Info
 } from 'lucide-react';
 import { exportCatalogXLSX, parseCatalogExcel } from '../services/exporter';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface ProductCatalogModalProps {
   isOpen: boolean;
@@ -52,6 +53,11 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
   const [formComprimento, setFormComprimento] = useState<string>('');
   const [formLargura, setFormLargura] = useState<string>('');
   const [formEspessura, setFormEspessura] = useState<string>('');
+
+  // Deletion modal state
+  const [itemToDelete, setItemToDelete] = useState<ProductCatalogItem | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -219,11 +225,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
 
             <button
               type="button"
-              onClick={() => {
-                if (confirm("Deseja recarregar o catálogo padrão de fábrica da Metalrib? Novos itens não serão perdidos.")) {
-                  onResetDefaults();
-                }
-              }}
+              onClick={() => setIsResetModalOpen(true)}
               className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium px-2.5 h-9 rounded-lg flex items-center gap-1 transition-colors border border-slate-300 cursor-pointer"
               title="Restaurar lista padrão Metalrib"
             >
@@ -485,11 +487,7 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Excluir o produto ${item.codigo} (${item.descricao}) do catálogo?`)) {
-                              onDeleteItem(item.id);
-                            }
-                          }}
+                          onClick={() => setItemToDelete(item)}
                           className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
                           title="Excluir item do catálogo"
                         >
@@ -519,6 +517,47 @@ export const ProductCatalogModal: React.FC<ProductCatalogModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Deletion Modals */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(itemToDelete)}
+        title="Excluir Produto do Catálogo"
+        message="Tem certeza que deseja remover este item do catálogo de produtos?"
+        itemDescription={
+          itemToDelete
+            ? `${itemToDelete.codigo} - ${itemToDelete.descricao} (${itemToDelete.categoria || 'Geral'})`
+            : undefined
+        }
+        onConfirm={async () => {
+          if (!itemToDelete) return;
+          setIsDeleting(true);
+          try {
+            await onDeleteItem(itemToDelete.id);
+            setItemToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+        isDeleting={isDeleting}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isResetModalOpen}
+        title="Restaurar Catálogo Padrão"
+        message="Deseja recarregar o catálogo padrão de fábrica da Metalrib? Seus novos produtos customizados serão mantidos."
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            await onResetDefaults();
+            setIsResetModalOpen(false);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setIsResetModalOpen(false)}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

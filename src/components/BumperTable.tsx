@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Printer, Trash2, Edit3, FileSpreadsheet, RefreshCw, CheckSquare, Square } from 'lucide-react';
 import { BumperItem, FilterState } from '../types';
 import { exportBumpersXLSX } from '../services/exporter';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface BumperTableProps {
   bumpers?: BumperItem[];
@@ -47,6 +48,9 @@ export const BumperTable: React.FC<BumperTableProps> = ({
   });
 
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<BumperItem | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const safeBumpers = bumpers || [];
 
@@ -266,12 +270,8 @@ export const BumperTable: React.FC<BumperTableProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Excluir bumper ${item.codigo}?`)) {
-                              handleDelete(item.id);
-                            }
-                          }}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors"
+                          onClick={() => setItemToDelete(item)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors cursor-pointer"
                           title="Excluir"
                         >
                           <Trash2 size={14} />
@@ -324,13 +324,9 @@ export const BumperTable: React.FC<BumperTableProps> = ({
 
           <button
             type="button"
-            onClick={() => {
-              if (confirm("Tem certeza que deseja apagar TODOS os bumpers salvos?")) {
-                handleClear();
-              }
-            }}
+            onClick={() => setIsClearAllModalOpen(true)}
             disabled={safeBumpers.length === 0}
-            className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50"
+            className="bg-slate-100 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-slate-300 disabled:opacity-50 cursor-pointer"
             title="Limpar todos os bumpers"
           >
             <Trash2 size={15} />
@@ -338,6 +334,48 @@ export const BumperTable: React.FC<BumperTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(itemToDelete)}
+        title="Excluir Bumper"
+        message="Tem certeza que deseja excluir este bumper do inventário?"
+        itemDescription={
+          itemToDelete
+            ? `${itemToDelete.codigo} (${itemToDelete.tipo}) - ${itemToDelete.medida_mm} mm x ${itemToDelete.quantidade} un`
+            : undefined
+        }
+        onConfirm={async () => {
+          if (!itemToDelete) return;
+          setIsDeleting(true);
+          try {
+            await handleDelete(itemToDelete.id);
+            setItemToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+        isDeleting={isDeleting}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isClearAllModalOpen}
+        title="Limpar Todos os Bumpers"
+        message="ATENÇÃO: Deseja apagar TODOS os bumpers salvos da lista? Esta ação removerá todos os registros permanentemente."
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            await handleClear();
+            setSelectedIds([]);
+            setIsClearAllModalOpen(false);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onClose={() => setIsClearAllModalOpen(false)}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

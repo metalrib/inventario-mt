@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { GeralItem, FilterState } from '../types';
 import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square } from 'lucide-react';
 import { exportGeraisXLSX } from '../services/exporter';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface GeralTableProps {
   items?: GeralItem[];
@@ -43,6 +44,12 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editForm, setEditForm] = useState<Partial<GeralItem>>({});
+
+  // Deletion modals state
+  const [itemToDelete, setItemToDelete] = useState<GeralItem | null>(null);
+  const [isDeleteBatchModalOpen, setIsDeleteBatchModalOpen] = useState(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -135,20 +142,55 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    if (confirm(`Tem certeza que deseja excluir os ${selectedIds.length} itens selecionados?`)) {
+    setIsDeleteBatchModalOpen(true);
+  };
+
+  const handleConfirmDeleteBatch = async () => {
+    setIsDeleting(true);
+    try {
       if (onDeleteBatch) {
-        onDeleteBatch(selectedIds);
+        await onDeleteBatch(selectedIds);
       } else {
-        selectedIds.forEach(id => onDeleteItem(id));
+        for (const id of selectedIds) {
+          await onDeleteItem(id);
+        }
       }
       setSelectedIds([]);
+      setIsDeleteBatchModalOpen(false);
+    } catch (err) {
+      console.error('Erro ao excluir lote:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleClearAllConfirm = () => {
-    if (confirm("Tem certeza que deseja apagar TODOS os itens e chapas da lista? Esta ação não pode ser desfeita.")) {
-      handleClear();
+    setIsClearAllModalOpen(true);
+  };
+
+  const handleConfirmClearAll = async () => {
+    setIsDeleting(true);
+    try {
+      await handleClear();
       setSelectedIds([]);
+      setIsClearAllModalOpen(false);
+    } catch (err) {
+      console.error('Erro ao limpar lista:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmSingleDelete = async () => {
+    if (!itemToDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteItem(itemToDelete.id);
+      setItemToDelete(null);
+    } catch (err) {
+      console.error('Erro ao excluir item:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -496,11 +538,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Deseja excluir o item ${item.codigo_item}?`)) {
-                              onDeleteItem(item.id);
-                            }
-                          }}
+                          onClick={() => setItemToDelete(item)}
                           title="Excluir Item"
                           className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
                         >
@@ -576,6 +614,39 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(itemToDelete)}
+        title="Excluir Item do Inventário"
+        message="Tem certeza que deseja excluir este item permanentemente do inventário?"
+        itemDescription={
+          itemToDelete
+            ? `${itemToDelete.codigo_item} - ${itemToDelete.descricao_item || 'Sem descrição'} (${itemToDelete.id_nomus || 'Sem ID'})`
+            : undefined
+        }
+        onConfirm={handleConfirmSingleDelete}
+        onClose={() => setItemToDelete(null)}
+        isDeleting={isDeleting}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteBatchModalOpen}
+        title="Excluir Itens Selecionados"
+        message={`Tem certeza que deseja excluir os ${selectedIds.length} itens selecionados? Esta ação não pode ser desfeita.`}
+        onConfirm={handleConfirmDeleteBatch}
+        onClose={() => setIsDeleteBatchModalOpen(false)}
+        isDeleting={isDeleting}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isClearAllModalOpen}
+        title="Limpar Todos os Registros"
+        message="ATENÇÃO: Deseja apagar TODOS os itens e chapas da lista? Esta ação removerá todos os registros permanentemente."
+        onConfirm={handleConfirmClearAll}
+        onClose={() => setIsClearAllModalOpen(false)}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };
