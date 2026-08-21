@@ -544,7 +544,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'metricas' && (
+        {activeTab === 'metrics' && (
           <MetricsDashboard
             perfis={perfis}
             bumpers={bumpers}

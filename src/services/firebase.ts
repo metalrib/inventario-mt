@@ -1,5 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore,
   collection,
   doc,
@@ -33,7 +36,25 @@ const databaseId = configJson.firestoreDatabaseId && configJson.firestoreDatabas
   ? configJson.firestoreDatabaseId
   : undefined;
 
-export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+// Robust Firestore instance with long-polling fallback and persistent cache
+function initFirestoreInstance() {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    }, databaseId);
+  } catch {
+    try {
+      return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+    } catch {
+      return getFirestore(app);
+    }
+  }
+}
+
+export const db = initFirestoreInstance();
 
 // Collection Names
 const COL_PERFIS = 'inventario';

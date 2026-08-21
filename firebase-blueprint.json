@@ -1,0 +1,198 @@
+{
+  "entities": {
+    "PerfilItem": {
+      "title": "PerfilItem",
+      "description": "Retalho de perfil de alumínio ou inox coletado no inventário",
+      "type": "object",
+      "properties": {
+        "id_nomus": {
+          "type": "string",
+          "description": "Identificador da etiqueta Nomus gerado ou bipado"
+        },
+        "codigo_perfil": {
+          "type": "string",
+          "description": "Código do perfil"
+        },
+        "descricao_perfil": {
+          "type": "string",
+          "description": "Descrição técnica do perfil"
+        },
+        "medida_mm": {
+          "type": "number",
+          "description": "Comprimento em milímetros"
+        },
+        "quantidade": {
+          "type": "number",
+          "description": "Quantidade de barras/retalhos"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status do item no inventário"
+        },
+        "operador": {
+          "type": "string",
+          "description": "Nome ou identificador do operador"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Data e hora de registro ISO"
+        }
+      },
+      "required": ["codigo_perfil", "medida_mm", "quantidade"]
+    },
+    "BumperItem": {
+      "title": "BumperItem",
+      "description": "Bumper ou calço registrado no inventário",
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "type": "string",
+          "description": "Tipo do bumper (ID ou OP)"
+        },
+        "codigo": {
+          "type": "string",
+          "description": "Código do bumper"
+        },
+        "medida_mm": {
+          "type": "number",
+          "description": "Medida em milímetros"
+        },
+        "quantidade": {
+          "type": "number",
+          "description": "Quantidade contada"
+        },
+        "id_nomus": {
+          "type": "string",
+          "description": "Identificador Nomus opcional"
+        },
+        "operador": {
+          "type": "string",
+          "description": "Nome do operador"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Data e hora de registro ISO"
+        }
+      },
+      "required": ["tipo", "codigo", "medida_mm", "quantidade"]
+    },
+    "GeralItem": {
+      "title": "GeralItem",
+      "description": "Chapa ou insumo geral registrado no inventário",
+      "type": "object",
+      "properties": {
+        "id_nomus": {
+          "type": "string",
+          "description": "Identificador da etiqueta Nomus"
+        },
+        "codigo_item": {
+          "type": "string",
+          "description": "Código do produto ou chapa"
+        },
+        "descricao_item": {
+          "type": "string",
+          "description": "Descrição do item ou chapa"
+        },
+        "comprimento_mm": {
+          "type": "number",
+          "description": "Comprimento em milímetros"
+        },
+        "largura_mm": {
+          "type": "number",
+          "description": "Largura em milímetros"
+        },
+        "espessura_mm": {
+          "type": "number",
+          "description": "Espessura em milímetros"
+        },
+        "quantidade": {
+          "type": "number",
+          "description": "Quantidade medida"
+        },
+        "unidade": {
+          "type": "string",
+          "description": "Unidade de medida (ex: M2, UN, KG)"
+        },
+        "operador": {
+          "type": "string",
+          "description": "Nome do operador"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Data e hora de registro ISO"
+        }
+      },
+      "required": ["codigo_item", "quantidade"]
+    },
+    "ProductCatalogItem": {
+      "title": "ProductCatalogItem",
+      "description": "Item do catálogo de produtos e chapas",
+      "type": "object",
+      "properties": {
+        "codigo": {
+          "type": "string",
+          "description": "Código do item"
+        },
+        "descricao": {
+          "type": "string",
+          "description": "Descrição do item"
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Categoria do produto"
+        },
+        "unidade": {
+          "type": "string",
+          "description": "Unidade padrão"
+        },
+        "comprimento_padrao_mm": {
+          "type": "number",
+          "description": "Comprimento padrão"
+        },
+        "largura_padrao_mm": {
+          "type": "number",
+          "description": "Largura padrão"
+        },
+        "espessura_padrao_mm": {
+          "type": "number",
+          "description": "Espessura padrão"
+        },
+        "medida_padrao_mm": {
+          "type": "number",
+          "description": "Medida padrão"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Data de criação ISO"
+        }
+      },
+      "required": ["codigo", "descricao"]
+    }
+  },
+  "firestore": {
+    "/inventario/{docId}": {
+      "schema": {
+        "$ref": "#/entities/PerfilItem"
+      },
+      "description": "Coleção de registros de perfis coletados"
+    },
+    "/inventario_bumpers/{docId}": {
+      "schema": {
+        "$ref": "#/entities/BumperItem"
+      },
+      "description": "Coleção de registros de bumpers coletados"
+    },
+    "/inventario_geral/{docId}": {
+      "schema": {
+        "$ref": "#/entities/GeralItem"
+      },
+      "description": "Coleção de registros de chapas e itens gerais"
+    },
+    "/catalogo_produtos/{docId}": {
+      "schema": {
+        "$ref": "#/entities/ProductCatalogItem"
+      },
+      "description": "Catálogo de produtos da empresa"
+    }
+  }
+}
