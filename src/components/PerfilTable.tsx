@@ -315,10 +315,10 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
             onClick={() => exportPerfisXLSX(safePerfis)}
             disabled={safePerfis.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-initial"
-            title="Exportar retalhos de perfis para arquivo Excel (.xlsx)"
+            title="Exportar retalhos com checklist e resumo consolidado para o PCP (.xlsx)"
           >
             <FileSpreadsheet size={15} />
-            <span>Baixar Planilha XLSX</span>
+            <span>Excel PCP (Checklist)</span>
           </button>
 
           <button
