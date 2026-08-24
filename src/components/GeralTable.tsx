@@ -267,10 +267,10 @@ export const GeralTable: React.FC<GeralTableProps> = ({
             onClick={() => exportGeraisXLSX(itemList)}
             disabled={itemList.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
-            title="Exportar chapas e insumos com checklist e resumo consolidado para o PCP (.xlsx)"
+            title="Exportar tabela de insumos e chapas para Excel (.xlsx)"
           >
             <FileSpreadsheet size={16} />
-            <span>Excel PCP (Checklist)</span>
+            <span>Exportar Excel (.xlsx)</span>
           </button>
 
           {selectedIds.length > 0 && (

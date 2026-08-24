@@ -82,10 +82,10 @@ export const BackupBar: React.FC<BackupBarProps> = ({
           type="button"
           onClick={handleExportExcelAll}
           className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold px-3 py-2 rounded-lg border border-emerald-700 transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
-          title="Exportar planilha inteligente para o PCP com checklist e resumos consolidados (.xlsx)"
+          title="Exportar todas as abas do inventário para planilha Excel (.xlsx)"
         >
           <FileSpreadsheet size={14} />
-          <span>Excel PCP (Checklist)</span>
+          <span>Exportar (.XLSX)</span>
         </button>
 
         <button
