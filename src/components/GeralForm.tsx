@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square } from 'lucide-react';
+import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
 import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/firebase';
 
@@ -65,6 +65,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     const saved = localStorage.getItem('metalrib_fixar_produto');
     return saved !== null ? saved === 'true' : true;
   });
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   const comprimentoInputRef = useRef<HTMLInputElement>(null);
   const codigoInputRef = useRef<HTMLInputElement>(null);
@@ -310,14 +311,14 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-lg border border-slate-200 mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+    <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-blue-50 text-[#1b367c] rounded-xl">
+          <div className="p-2 bg-blue-50 text-[#1b367c] rounded-xl shrink-0">
             <Package size={22} />
           </div>
           <div>
-            <h2 className="text-base font-black text-[#1b367c] flex items-center gap-2">
+            <h2 className="text-base font-black text-[#1b367c] flex items-center gap-2 flex-wrap">
               <span>Cadastro de Chapas & Insumos</span>
               <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 flex items-center gap-1">
                 <Sparkles size={11} className="text-emerald-600" />
@@ -330,7 +331,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-center">
           <button
             type="button"
             onClick={handleOpenCatalogView}
@@ -340,48 +341,69 @@ export const GeralForm: React.FC<GeralFormProps> = ({
             <BookOpen size={15} />
             <span>Consultar Catálogo</span>
           </button>
-        </div>
-      </div>
 
-      {/* Fast Inventory Acceleration Toolbar */}
-      <div className="mb-4 bg-gradient-to-r from-blue-50/80 via-slate-50 to-emerald-50/70 p-2.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-        <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-          <Zap size={14} className="text-amber-500 fill-amber-500" />
-          <span>Modo Contagem Rápida:</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Toggle: Auto-Gerar ID */}
           <button
             type="button"
-            onClick={() => handleToggleAutoGerarId(!autoGerarId)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
-              autoGerarId
-                ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-            }`}
-            title="Gera o ID automaticamente a cada cadastro sem precisar clicar em 'Gerar ID'"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title={isCollapsed ? "Expandir formulário de cadastro" : "Minimizar formulário para focar na tabela"}
           >
-            <Zap size={13} className={autoGerarId ? 'fill-white' : 'text-slate-400'} />
-            <span>Auto-Gerar ID: {autoGerarId ? 'LIGADO' : 'DESLIGADO'}</span>
-          </button>
-
-          {/* Toggle: Fixar Produto */}
-          <button
-            type="button"
-            onClick={() => handleToggleFixarProduto(!fixarProduto)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
-              fixarProduto
-                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-            }`}
-            title="Mantém o produto selecionado para cadastrar várias chapas do mesmo código seguidas"
-          >
-            <Pin size={13} className={fixarProduto ? 'rotate-45' : 'text-slate-400'} />
-            <span>Fixar Produto: {fixarProduto ? 'LIGADO' : 'DESLIGADO'}</span>
+            {isCollapsed ? (
+              <>
+                <ChevronDown size={16} />
+                <span className="hidden sm:inline">Expandir Cadastro</span>
+              </>
+            ) : (
+              <>
+                <ChevronUp size={16} />
+                <span className="hidden sm:inline">Recolher</span>
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {!isCollapsed && (
+        <div className="mt-4 animate-fadeIn">
+          {/* Fast Inventory Acceleration Toolbar */}
+          <div className="mb-4 bg-gradient-to-r from-blue-50/80 via-slate-50 to-emerald-50/70 p-2.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+              <Zap size={14} className="text-amber-500 fill-amber-500" />
+              <span>Modo Contagem Rápida:</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Toggle: Auto-Gerar ID */}
+              <button
+                type="button"
+                onClick={() => handleToggleAutoGerarId(!autoGerarId)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                  autoGerarId
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                }`}
+                title="Gera o ID automaticamente a cada cadastro sem precisar clicar em 'Gerar ID'"
+              >
+                <Zap size={13} className={autoGerarId ? 'fill-white' : 'text-slate-400'} />
+                <span>Auto-Gerar ID: {autoGerarId ? 'LIGADO' : 'DESLIGADO'}</span>
+              </button>
+
+              {/* Toggle: Fixar Produto */}
+              <button
+                type="button"
+                onClick={() => handleToggleFixarProduto(!fixarProduto)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                  fixarProduto
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                }`}
+                title="Mantém o produto selecionado para cadastrar várias chapas do mesmo código seguidas"
+              >
+                <Pin size={13} className={fixarProduto ? 'rotate-45' : 'text-slate-400'} />
+                <span>Fixar Produto: {fixarProduto ? 'LIGADO' : 'DESLIGADO'}</span>
+              </button>
+            </div>
+          </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ID Nomus & Operador */}
@@ -692,6 +714,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
           </button>
         </div>
       </form>
+        </div>
+      )}
     </div>
   );
 };
