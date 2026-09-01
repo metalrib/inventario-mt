@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp, Palette } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
 import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/firebase';
 
@@ -67,14 +67,35 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   });
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
+  // Tone / Tom selection state (stays persistent across subsequent entries)
+  const [selectedTom, setSelectedTom] = useState<string>(() => {
+    return localStorage.getItem('metalrib_selected_tom') || '';
+  });
+  const [customTomInput, setCustomTomInput] = useState<string>('');
+
   const comprimentoInputRef = useRef<HTMLInputElement>(null);
   const codigoInputRef = useRef<HTMLInputElement>(null);
+
+  const formatTomSuffix = (tom: string): string => {
+    const clean = (tom || '').trim().toUpperCase();
+    if (!clean) return '';
+    if (clean.startsWith('T')) return `.${clean}`;
+    return `.T${clean}`;
+  };
+
+  const applyTomToId = (baseOrFullId: string, tom: string): string => {
+    const base = (baseOrFullId || '').replace(/\.T[A-Za-z0-9_-]+$/i, '').trim();
+    if (!base) return '';
+    const suffix = formatTomSuffix(tom);
+    return base + suffix;
+  };
 
   // Auto-generate ID on mount if active or if current ID is already taken
   useEffect(() => {
     if (autoGerarId) {
       if (!idNomus || existingNomusIds.includes(idNomus.trim())) {
-        setIdNomus(generateUniqueNomusId(existingNomusIds, idNomus));
+        const base = generateUniqueNomusId(existingNomusIds, idNomus.replace(/\.T[A-Za-z0-9_-]+$/i, ''));
+        setIdNomus(selectedTom ? applyTomToId(base, selectedTom) : base);
       }
     }
   }, [autoGerarId, existingNomusIds]);
@@ -84,7 +105,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
     localStorage.setItem('metalrib_auto_gerar_id', String(val));
     if (val) {
       if (!idNomus || existingNomusIds.includes(idNomus.trim())) {
-        setIdNomus(generateUniqueNomusId(existingNomusIds, idNomus));
+        const base = generateUniqueNomusId(existingNomusIds, idNomus.replace(/\.T[A-Za-z0-9_-]+$/i, ''));
+        setIdNomus(selectedTom ? applyTomToId(base, selectedTom) : base);
       }
     }
   };
@@ -92,6 +114,27 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const handleToggleFixarProduto = (val: boolean) => {
     setFixarProduto(val);
     localStorage.setItem('metalrib_fixar_produto', String(val));
+  };
+
+  const handleSelectTom = (tom: string) => {
+    const clean = tom.trim().toUpperCase().replace(/^T/i, '');
+    setSelectedTom(clean);
+    localStorage.setItem('metalrib_selected_tom', clean);
+
+    if (idNomus) {
+      setIdNomus(applyTomToId(idNomus, clean));
+    } else if (autoGerarId) {
+      const base = generateUniqueNomusId(existingNomusIds);
+      setIdNomus(applyTomToId(base, clean));
+    }
+  };
+
+  const handleApplyCustomTom = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (customTomInput.trim()) {
+      handleSelectTom(customTomInput.trim());
+      setCustomTomInput('');
+    }
   };
 
   useEffect(() => {
@@ -196,15 +239,17 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   }).slice(0, 6);
 
   const handleGenerateId = () => {
-    const nextId = generateUniqueNomusId(existingNomusIds, idNomus);
-    setIdNomus(nextId);
+    const base = generateUniqueNomusId(existingNomusIds, idNomus.replace(/\.T[A-Za-z0-9_-]+$/i, ''));
+    const fullId = selectedTom ? applyTomToId(base, selectedTom) : base;
+    setIdNomus(fullId);
   };
 
   const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     // Format automatically as AAAA.MM.DD.HHMM if user is typing pure digits
     if (/^\d+$/.test(val) && val.length > 4) {
-      setIdNomus(formatNomusIdInput(val));
+      const formatted = formatNomusIdInput(val);
+      setIdNomus(selectedTom ? applyTomToId(formatted, selectedTom) : formatted);
     } else {
       setIdNomus(val);
     }
@@ -218,7 +263,11 @@ export const GeralForm: React.FC<GeralFormProps> = ({
       return;
     }
 
-    const finalIdNomus = idNomus.trim() || generateUniqueNomusId(existingNomusIds);
+    let finalIdNomus = idNomus.trim();
+    if (!finalIdNomus) {
+      const base = generateUniqueNomusId(existingNomusIds);
+      finalIdNomus = selectedTom ? applyTomToId(base, selectedTom) : base;
+    }
     const finalCodigo = codigoItem.trim().toUpperCase();
     const finalDescricao = descricaoItem.trim() || finalCodigo;
 
@@ -296,10 +345,10 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         }, 120);
       }
 
-      // If auto-generate ID is active, generate next ID automatically!
+      // If auto-generate ID is active, generate next ID automatically with active Tom preserved!
       if (autoGerarId) {
-        const nextId = generateUniqueNomusId([finalIdNomus, ...existingNomusIds]);
-        setIdNomus(nextId);
+        const nextBase = generateUniqueNomusId([finalIdNomus, ...existingNomusIds]);
+        setIdNomus(selectedTom ? applyTomToId(nextBase, selectedTom) : nextBase);
       } else {
         setIdNomus('');
       }
@@ -438,9 +487,105 @@ export const GeralForm: React.FC<GeralFormProps> = ({
                 <span>Regerar ID</span>
               </button>
             </div>
-            <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-              Identificador único gerado automaticamente para o QR Code da etiqueta.
-            </span>
+
+            {/* Tom / Tonalidade Selector - Below ID Nomus */}
+            <div className="mt-2.5 p-2.5 bg-slate-50/90 border border-slate-200 rounded-xl">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                  <Palette size={14} className="text-[#1b367c]" />
+                  <span>Tom da Chapa / Sufixo do ID:</span>
+                  <span className="text-[11px] font-normal text-slate-500 hidden sm:inline">
+                    (fixo para as próximas aferições)
+                  </span>
+                </div>
+
+                {selectedTom ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-[#1b367c] border border-blue-200">
+                    <Check size={11} className="text-blue-700" />
+                    Sufixo: <strong className="font-mono">{formatTomSuffix(selectedTom)}</strong>
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                    Sem Tom (padrão)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Botão Sem Tom */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectTom('')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
+                    !selectedTom
+                      ? 'bg-slate-700 text-white border-slate-800 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                  }`}
+                  title="Não anexar sufixo de Tom ao ID"
+                >
+                  Sem Tom
+                </button>
+
+                {/* Botões Rápidos: Tom 1 até Tom 5 */}
+                {[
+                  { label: 'Tom 1', val: '1', suffix: '.T1' },
+                  { label: 'Tom 2', val: '2', suffix: '.T2' },
+                  { label: 'Tom 3', val: '3', suffix: '.T3' },
+                  { label: 'Tom 4', val: '4', suffix: '.T4' },
+                  { label: 'Tom 5', val: '5', suffix: '.T5' }
+                ].map(t => {
+                  const isSelected = selectedTom === t.val || selectedTom === `T${t.val}`;
+                  return (
+                    <button
+                      key={t.val}
+                      type="button"
+                      onClick={() => handleSelectTom(t.val)}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'bg-[#1b367c] text-white border-blue-900 shadow-xs ring-2 ring-blue-300/60'
+                          : 'bg-white text-slate-700 border-slate-300 hover:border-blue-300 hover:bg-blue-50/60'
+                      }`}
+                      title={`Definir sufixo ${t.suffix}`}
+                    >
+                      <span>{t.label}</span>
+                      <span className={`text-[10px] font-mono font-bold px-1 py-0.2 rounded ${
+                        isSelected ? 'bg-blue-900/60 text-blue-100' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {t.suffix}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {/* Campo para Tom Personalizado */}
+                <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5 pl-2 shadow-2xs">
+                  <span className="text-[11px] font-bold text-slate-500 font-mono">T</span>
+                  <input
+                    type="text"
+                    placeholder="Nº"
+                    value={customTomInput}
+                    onChange={e => setCustomTomInput(e.target.value.replace(/[^0-9A-Za-z]/g, ''))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyCustomTom();
+                      }
+                    }}
+                    className="w-10 h-6 text-xs font-bold font-mono text-center border-none focus:outline-none bg-transparent"
+                    maxLength={3}
+                    title="Digite um número de tom personalizado (ex: 6 para .T6)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCustomTom()}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-[#1b367c] hover:text-white text-slate-700 text-[11px] font-bold rounded transition-colors cursor-pointer"
+                    title="Aplicar Tom personalizado"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>

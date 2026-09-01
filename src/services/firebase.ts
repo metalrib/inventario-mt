@@ -648,11 +648,22 @@ export async function syncAllToFirebase(
 // Set to keep track of recently generated / reserved IDs in this session
 const recentlyUsedIds = new Set<string>();
 
+function addIdToTrack(set: Set<string>, id: string) {
+  if (!id) return;
+  const clean = id.trim();
+  if (!clean) return;
+  set.add(clean);
+  const baseOnly = clean.replace(/\.T[A-Za-z0-9_-]+$/i, '').trim();
+  if (baseOnly) {
+    set.add(baseOnly);
+  }
+}
+
 export function registerUsedNomusId(id: string): void {
   if (!id) return;
   const clean = id.trim();
   if (clean) {
-    recentlyUsedIds.add(clean);
+    addIdToTrack(recentlyUsedIds, clean);
     try {
       const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
       if (Array.isArray(stored) && !stored.includes(clean)) {
@@ -671,12 +682,12 @@ export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
 
   // 1. Extra IDs passed as arguments
   for (const id of extraIds) {
-    if (id && id.trim()) ids.add(id.trim());
+    addIdToTrack(ids, id);
   }
 
   // 2. In-memory recently used IDs
   for (const id of recentlyUsedIds) {
-    if (id && id.trim()) ids.add(id.trim());
+    addIdToTrack(ids, id);
   }
 
   // 3. SessionStorage reserved IDs
@@ -684,7 +695,7 @@ export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
     const stored = JSON.parse(sessionStorage.getItem('metalrib_reserved_ids') || '[]');
     if (Array.isArray(stored)) {
       for (const id of stored) {
-        if (id && typeof id === 'string') ids.add(id.trim());
+        if (id && typeof id === 'string') addIdToTrack(ids, id);
       }
     }
   } catch {}
@@ -693,16 +704,16 @@ export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
   try {
     const perfis = getLocalPerfis();
     for (const p of perfis) {
-      if (p.id_nomus) ids.add(p.id_nomus.trim());
+      if (p.id_nomus) addIdToTrack(ids, p.id_nomus);
     }
     const bumpers = getLocalBumpers();
     for (const b of bumpers) {
-      if (b.id_nomus) ids.add(b.id_nomus.trim());
-      if (b.tipo === 'ID' && b.codigo) ids.add(b.codigo.trim());
+      if (b.id_nomus) addIdToTrack(ids, b.id_nomus);
+      if (b.tipo === 'ID' && b.codigo) addIdToTrack(ids, b.codigo);
     }
     const gerais = getLocalGerais();
     for (const g of gerais) {
-      if (g.id_nomus) ids.add(g.id_nomus.trim());
+      if (g.id_nomus) addIdToTrack(ids, g.id_nomus);
     }
   } catch {}
 
@@ -712,7 +723,7 @@ export function getAllKnownNomusIds(extraIds: string[] = []): Set<string> {
 export function generateUniqueNomusId(existingIds: string[] = [], currentId?: string): string {
   const idsToAvoid = getAllKnownNomusIds(existingIds);
   if (currentId && currentId.trim()) {
-    idsToAvoid.add(currentId.trim());
+    addIdToTrack(idsToAvoid, currentId);
   }
 
   const d = new Date();
@@ -735,15 +746,19 @@ export function generateUniqueNomusId(existingIds: string[] = [], currentId?: st
 }
 
 export function formatNomusIdInput(value: string): string {
-  const raw = value.replace(/\D/g, '');
-  if (!raw) return '';
+  const toneMatch = value.match(/(\.T[A-Za-z0-9_-]+)$/i);
+  const toneSuffix = toneMatch ? toneMatch[1].toUpperCase() : '';
+  const valWithoutTone = toneMatch ? value.substring(0, toneMatch.index) : value;
+
+  const raw = valWithoutTone.replace(/\D/g, '');
+  if (!raw) return toneSuffix;
   const trimmed = raw.slice(0, 12);
   let formatted = '';
   if (trimmed.length > 0) formatted += trimmed.substring(0, 4);
   if (trimmed.length > 4) formatted += '.' + trimmed.substring(4, 6);
   if (trimmed.length > 6) formatted += '.' + trimmed.substring(6, 8);
   if (trimmed.length > 8) formatted += '.' + trimmed.substring(8, 12);
-  return formatted;
+  return formatted + toneSuffix;
 }
 
 export function findCatalogProductByCode(code: string, catalog?: ProductCatalogItem[]): ProductCatalogItem | undefined {
