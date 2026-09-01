@@ -325,31 +325,31 @@ export const GeralTable: React.FC<GeralTableProps> = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[650px] 2xl:max-h-[calc(100vh-290px)] rounded-xl border border-slate-200 shadow-xs">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-x-auto overflow-y-auto max-h-[650px] 2xl:max-h-[calc(100vh-290px)] rounded-xl border border-slate-200 shadow-xs bg-white">
+        <table className="w-full text-left border-collapse min-w-[780px]">
           <thead className="sticky top-0 z-10 bg-slate-100 shadow-xs border-b-2 border-slate-200">
             <tr className="text-[11px] font-black text-slate-600 uppercase tracking-wider">
               <th className="p-3 w-10 text-center">
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  className="flex items-center justify-center cursor-pointer"
+                  className="flex items-center justify-center cursor-pointer p-1"
                   title={selectedIds.length === sortedItems.length && sortedItems.length > 0 ? "Desmarcar todos" : "Selecionar todos"}
                 >
                   {selectedIds.length > 0 && selectedIds.length === sortedItems.length ? (
-                    <CheckSquare size={16} className="text-[#1b367c]" />
+                    <CheckSquare size={17} className="text-[#1b367c]" />
                   ) : (
-                    <Square size={16} className="text-slate-400" />
+                    <Square size={17} className="text-slate-400" />
                   )}
                 </button>
               </th>
-              <th className="p-3">Código de Barras</th>
-              <th className="p-3">Código Item</th>
-              <th className="p-3">Descrição</th>
-              <th className="p-3 text-center">Dimensões & Área (m²)</th>
-              <th className="p-3 text-center">Qtd / Unid.</th>
-              <th className="p-3 text-center">Data / Operador</th>
-              <th className="p-3 text-right">Ações</th>
+              <th className="p-3 w-36 whitespace-nowrap">Código de Barras</th>
+              <th className="p-3 w-28 whitespace-nowrap">Código Item</th>
+              <th className="p-3 min-w-[160px]">Descrição</th>
+              <th className="p-3 text-center w-36">Dimensões & Área (m²)</th>
+              <th className="p-3 text-center w-28">Qtd / Unid.</th>
+              <th className="p-3 text-center w-28">Data / Operador</th>
+              <th className="p-3 text-right w-28">Ações</th>
             </tr>
           </thead>
 
@@ -522,30 +522,30 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       <div className="font-semibold text-slate-700">{item.operador}</div>
                     </td>
                     <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => onOpenSinglePrint(item)}
                           title="Imprimir Etiqueta"
-                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#1b367c] rounded-lg transition-colors border border-blue-200 cursor-pointer"
+                          className="h-8.5 w-8.5 flex items-center justify-center bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-[#1b367c] rounded-lg transition-colors border border-blue-200 cursor-pointer shrink-0"
                         >
-                          <Tag size={15} />
+                          <Tag size={16} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleStartEdit(item)}
                           title="Editar Item"
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors cursor-pointer"
+                          className="h-8.5 w-8.5 flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-lg transition-colors cursor-pointer shrink-0"
                         >
-                          <Edit2 size={15} />
+                          <Edit2 size={16} />
                         </button>
                         <button
                           type="button"
                           onClick={() => setItemToDelete(item)}
                           title="Excluir Item"
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                          className="h-8.5 w-8.5 flex items-center justify-center bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 rounded-lg transition-colors cursor-pointer shrink-0"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>

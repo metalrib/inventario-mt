@@ -173,30 +173,30 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[620px] 2xl:max-h-[calc(100vh-290px)] border border-slate-200 rounded-lg mb-3 shadow-xs">
-        <table className="w-full text-left border-collapse text-xs">
+      <div className="overflow-x-auto overflow-y-auto max-h-[620px] 2xl:max-h-[calc(100vh-290px)] border border-slate-200 rounded-lg mb-3 shadow-xs bg-white">
+        <table className="w-full text-left border-collapse text-xs min-w-[620px]">
           <thead className="bg-slate-100 text-[#1b367c] font-black sticky top-0 z-10 border-b-2 border-slate-200">
             <tr>
               <th className="p-2.5 w-10 text-center">
-                <button type="button" onClick={toggleSelectAll}>
+                <button type="button" onClick={toggleSelectAll} className="p-1 cursor-pointer">
                   {selectedIds.length > 0 && selectedIds.length === sorted.length ? (
-                    <CheckSquare size={16} className="text-[#1b367c]" />
+                    <CheckSquare size={17} className="text-[#1b367c]" />
                   ) : (
-                    <Square size={16} className="text-slate-400" />
+                    <Square size={17} className="text-slate-400" />
                   )}
                 </button>
               </th>
-              <th className="p-2.5">Status / ID Nomus</th>
-              <th className="p-2.5">Código / Descrição</th>
-              <th className="p-2.5 text-right">Medida</th>
-              <th className="p-2.5 text-center">Qtd</th>
-              <th className="p-2.5 text-center">Ações</th>
+              <th className="p-2.5 w-36 whitespace-nowrap">Status / ID Nomus</th>
+              <th className="p-2.5 min-w-[140px]">Código / Descrição</th>
+              <th className="p-2.5 text-right w-24">Medida</th>
+              <th className="p-2.5 text-center w-16">Qtd</th>
+              <th className="p-2.5 text-center w-28">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-400">
+                <td colSpan={6} className="py-8 text-center text-slate-400 font-bold">
                   Nenhum retalho registrado nesta consulta.
                 </td>
               </tr>
@@ -211,11 +211,11 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                     }`}
                   >
                     <td className="p-2.5 text-center">
-                      <button type="button" onClick={() => toggleSelectItem(item.id)}>
+                      <button type="button" onClick={() => toggleSelectItem(item.id)} className="p-1 cursor-pointer">
                         {isSelected ? (
-                          <CheckSquare size={16} className="text-[#1b367c]" />
+                          <CheckSquare size={17} className="text-[#1b367c]" />
                         ) : (
-                          <Square size={16} className="text-slate-300" />
+                          <Square size={17} className="text-slate-300" />
                         )}
                       </button>
                     </td>
@@ -240,7 +240,7 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="p-2.5 text-right font-extrabold text-slate-800">
+                    <td className="p-2.5 text-right font-extrabold text-slate-800 whitespace-nowrap">
                       {item.medida_mm} <span className="text-slate-400 text-[10px]">mm</span>
                     </td>
 
@@ -249,30 +249,30 @@ export const PerfilTable: React.FC<PerfilTableProps> = ({
                     </td>
 
                     <td className="p-2.5 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handlePrintSingle(item)}
-                          className="bg-sky-50 hover:bg-sky-100 text-sky-700 p-1.5 rounded-md transition-colors"
+                          className="h-8 w-8 flex items-center justify-center bg-sky-50 hover:bg-sky-100 active:bg-sky-200 text-sky-700 rounded-lg transition-colors border border-sky-200 cursor-pointer shrink-0"
                           title="Imprimir Etiqueta Térmica"
                         >
-                          <Printer size={14} />
+                          <Printer size={15} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleEdit(item)}
-                          className="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded-md transition-colors"
+                          className="h-8 w-8 flex items-center justify-center bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 rounded-lg transition-colors border border-amber-200 cursor-pointer shrink-0"
                           title="Editar Registro"
                         >
-                          <Edit3 size={14} />
+                          <Edit3 size={15} />
                         </button>
                         <button
                           type="button"
-                          onClick={() => setItemToDelete(item)}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-md transition-colors cursor-pointer"
-                          title="Excluir"
+                          onClick={() => handleDelete(item.id)}
+                          className="h-8 w-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 rounded-lg transition-colors border border-rose-200 cursor-pointer shrink-0"
+                          title="Excluir Registro"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>

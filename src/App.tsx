@@ -16,6 +16,7 @@ import { ScannerModal } from './components/ScannerModal';
 import { ScanResultModal } from './components/ScanResultModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MetricsDashboard } from './components/MetricsDashboard';
+import { Columns, Layout, Table, FileEdit, Maximize2, Minimize2 } from 'lucide-react';
 import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, ProductCatalogItem, AppConfig } from './types';
 import {
   subscribeToPerfis,
@@ -51,6 +52,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('gerais');
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [config, setConfig] = useState<AppConfig>(getAppConfig());
+  const [viewMode, setViewMode] = useState<'split' | 'form' | 'table'>(() => {
+    const saved = localStorage.getItem('metalrib_tablet_view_mode');
+    return (saved as 'split' | 'form' | 'table') || 'split';
+  });
+
+  const handleSetViewMode = (mode: 'split' | 'form' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('metalrib_tablet_view_mode', mode);
+  };
 
   // Data states
   const [perfis, setPerfis] = useState<PerfilItem[]>([]);
@@ -442,105 +452,208 @@ export default function App() {
         geraisCount={safeGerais.length}
       />
 
+      {/* Responsive View Switcher for Tablets & Desktops */}
+      {activeTab !== 'metrics' && (
+        <div className="bg-white border border-slate-200 rounded-xl p-1.5 sm:p-2 mb-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-bold px-1.5">
+            <Layout size={15} className="text-[#1b367c]" />
+            <span className="hidden sm:inline">Modo de Exibição:</span>
+            <span className="sm:hidden">Visualização:</span>
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-extrabold">
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('split')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'split'
+                  ? 'bg-[#1b367c] text-white shadow-xs'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+              title="Exibir Formulário e Tabela lado a lado"
+            >
+              <Columns size={14} />
+              <span>Lado a Lado</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('form')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'form'
+                  ? 'bg-[#1b367c] text-white shadow-xs'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+              title="Focar 100% no formulário para digitação rápida no tablet"
+            >
+              <FileEdit size={14} />
+              <span>Apenas Formulário</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-[#1b367c] text-white shadow-xs'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+              title="Expandir Tabela em Tela Cheia para conferência e impressão"
+            >
+              <Table size={14} />
+              <span>Apenas Tabela</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Tab Views */}
       <main className="w-full">
         {activeTab === 'perfis' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
-            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
-              <PerfilForm
-                onSavePerfil={handleSavePerfil}
-                onOpenCatalog={() => setIsCatalogOpen(true)}
-                selectedCatalogItem={selectedCatalogItem}
-                manterMedidaPerfis={config.manterMedidaPerfis}
-                onToggleManterMedida={val => {
-                  const newCfg = { ...config, manterMedidaPerfis: val };
-                  setConfig(newCfg);
-                  saveAppConfig(newCfg);
-                }}
-                existingNomusIds={allExistingNomusIds}
-                operadorPadrao={config.operadorPadrao}
-              />
-            </div>
-            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
-              <PerfilTable
-                perfis={perfis}
-                onEditPerfil={(item) => {
-                  setEditingItem(item);
-                  setEditingItemType('perfil');
-                  setIsEditModalOpen(true);
-                }}
-                onDeletePerfil={handleDeletePerfil}
-                onDeleteItem={handleDeletePerfil}
-                onClearPerfis={handleClearPerfis}
-                onClearAll={handleClearPerfis}
-                onPrintSingle={handlePrintSinglePerfil}
-                onPrintBatch={handlePrintBatchPerfis}
-              />
-            </div>
+          <div className={`w-full items-start ${
+            viewMode === 'split'
+              ? 'grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-5'
+              : 'block'
+          }`}>
+            {(viewMode === 'split' || viewMode === 'form') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-4 xl:col-span-4 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start mb-4 lg:mb-0'
+                  : 'w-full max-w-3xl mx-auto'
+              }>
+                <PerfilForm
+                  onSavePerfil={handleSavePerfil}
+                  onOpenCatalog={() => setIsCatalogOpen(true)}
+                  selectedCatalogItem={selectedCatalogItem}
+                  manterMedidaPerfis={config.manterMedidaPerfis}
+                  onToggleManterMedida={val => {
+                    const newCfg = { ...config, manterMedidaPerfis: val };
+                    setConfig(newCfg);
+                    saveAppConfig(newCfg);
+                  }}
+                  existingNomusIds={allExistingNomusIds}
+                  operadorPadrao={config.operadorPadrao}
+                />
+              </div>
+            )}
+            {(viewMode === 'split' || viewMode === 'table') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-8 xl:col-span-8 2xl:col-span-8 min-w-0'
+                  : 'w-full'
+              }>
+                <PerfilTable
+                  perfis={perfis}
+                  onEditPerfil={(item) => {
+                    setEditingItem(item);
+                    setEditingItemType('perfil');
+                    setIsEditModalOpen(true);
+                  }}
+                  onDeletePerfil={handleDeletePerfil}
+                  onDeleteItem={handleDeletePerfil}
+                  onClearPerfis={handleClearPerfis}
+                  onClearAll={handleClearPerfis}
+                  onPrintSingle={handlePrintSinglePerfil}
+                  onPrintBatch={handlePrintBatchPerfis}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'bumpers' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
-            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
-              <BumperForm
-                onSaveBumper={handleSaveBumper}
-                manterMedidaBumpers={config.manterMedidaBumpers}
-                onToggleManterMedida={val => {
-                  const newCfg = { ...config, manterMedidaBumpers: val };
-                  setConfig(newCfg);
-                  saveAppConfig(newCfg);
-                }}
-                existingNomusIds={allExistingNomusIds}
-                operadorPadrao={config.operadorPadrao}
-              />
-            </div>
-            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
-              <BumperTable
-                bumpers={bumpers}
-                onEditBumper={(item) => {
-                  setEditingItem(item);
-                  setEditingItemType('bumper');
-                  setIsEditModalOpen(true);
-                }}
-                onDeleteBumper={handleDeleteBumper}
-                onDeleteItem={handleDeleteBumper}
-                onClearBumpers={handleClearBumpers}
-                onClearAll={handleClearBumpers}
-                onPrintSingle={handlePrintSingleBumper}
-                onPrintBatch={handlePrintBatchBumpers}
-              />
-            </div>
+          <div className={`w-full items-start ${
+            viewMode === 'split'
+              ? 'grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-5'
+              : 'block'
+          }`}>
+            {(viewMode === 'split' || viewMode === 'form') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-4 xl:col-span-4 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start mb-4 lg:mb-0'
+                  : 'w-full max-w-3xl mx-auto'
+              }>
+                <BumperForm
+                  onSaveBumper={handleSaveBumper}
+                  manterMedidaBumpers={config.manterMedidaBumpers}
+                  onToggleManterMedida={val => {
+                    const newCfg = { ...config, manterMedidaBumpers: val };
+                    setConfig(newCfg);
+                    saveAppConfig(newCfg);
+                  }}
+                  existingNomusIds={allExistingNomusIds}
+                  operadorPadrao={config.operadorPadrao}
+                />
+              </div>
+            )}
+            {(viewMode === 'split' || viewMode === 'table') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-8 xl:col-span-8 2xl:col-span-8 min-w-0'
+                  : 'w-full'
+              }>
+                <BumperTable
+                  bumpers={bumpers}
+                  onEditBumper={(item) => {
+                    setEditingItem(item);
+                    setEditingItemType('bumper');
+                    setIsEditModalOpen(true);
+                  }}
+                  onDeleteBumper={handleDeleteBumper}
+                  onDeleteItem={handleDeleteBumper}
+                  onClearBumpers={handleClearBumpers}
+                  onClearAll={handleClearBumpers}
+                  onPrintSingle={handlePrintSingleBumper}
+                  onPrintBatch={handlePrintBatchBumpers}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'gerais' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-6 w-full items-start">
-            <div className="lg:col-span-5 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start">
-              <GeralForm
-                onSaveGeral={handleSaveGeral}
-                productCatalog={productCatalog}
-                prefilledProductItem={prefilledProductItem}
-                onClearPrefilledProduct={() => setPrefilledProductItem(null)}
-                existingNomusIds={allExistingNomusIds}
-                onOpenCatalogModal={() => setIsProductCatalogOpen(true)}
-                operadorPadrao={config.operadorPadrao}
-                onPrintGeralItem={handlePrintSingleGeral}
-              />
-            </div>
-            <div className="lg:col-span-7 2xl:col-span-8 min-w-0">
-              <GeralTable
-                gerais={gerais}
-                onEditGeral={handleEditGeral}
-                onDeleteGeral={handleDeleteGeral}
-                onDeleteItem={handleDeleteGeral}
-                onClearGerais={handleClearGerais}
-                onClearAll={handleClearGerais}
-                onPrintSingle={handlePrintSingleGeral}
-                onPrintBatch={handlePrintBatchGerais}
-                onDeleteBatch={handleDeleteBatchGerais}
-              />
-            </div>
+          <div className={`w-full items-start ${
+            viewMode === 'split'
+              ? 'grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-5'
+              : 'block'
+          }`}>
+            {(viewMode === 'split' || viewMode === 'form') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-4 xl:col-span-4 2xl:col-span-4 lg:sticky lg:top-4 lg:self-start mb-4 lg:mb-0'
+                  : 'w-full max-w-3xl mx-auto'
+              }>
+                <GeralForm
+                  onSaveGeral={handleSaveGeral}
+                  productCatalog={productCatalog}
+                  prefilledProductItem={prefilledProductItem}
+                  onClearPrefilledProduct={() => setPrefilledProductItem(null)}
+                  existingNomusIds={allExistingNomusIds}
+                  onOpenCatalogModal={() => setIsProductCatalogOpen(true)}
+                  operadorPadrao={config.operadorPadrao}
+                  onPrintGeralItem={handlePrintSingleGeral}
+                />
+              </div>
+            )}
+            {(viewMode === 'split' || viewMode === 'table') && (
+              <div className={
+                viewMode === 'split'
+                  ? 'lg:col-span-8 xl:col-span-8 2xl:col-span-8 min-w-0'
+                  : 'w-full'
+              }>
+                <GeralTable
+                  gerais={gerais}
+                  onEditGeral={handleEditGeral}
+                  onDeleteGeral={handleDeleteGeral}
+                  onDeleteItem={handleDeleteGeral}
+                  onClearGerais={handleClearGerais}
+                  onClearAll={handleClearGerais}
+                  onPrintSingle={handlePrintSingleGeral}
+                  onPrintBatch={handlePrintBatchGerais}
+                  onDeleteBatch={handleDeleteBatchGerais}
+                />
+              </div>
+            )}
           </div>
         )}
 
