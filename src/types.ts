@@ -1,4 +1,5 @@
 export type BumperType = 'ID' | 'OP';
+export type LabelFormat = '100x50' | '100x100_dupla' | '100x100_cheia';
 
 export interface PerfilItem {
   id: string | number;
@@ -67,6 +68,7 @@ export interface AppConfig {
   manterMedidaPerfis: boolean;
   autoGerarIdNomus?: boolean;
   fixarProdutoGeral?: boolean;
+  formatoEtiquetaPadrao?: LabelFormat;
 }
 
 export interface FilterState {

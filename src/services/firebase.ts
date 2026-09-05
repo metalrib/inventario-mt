@@ -777,7 +777,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   manterMedidaBumpers: false,
   manterMedidaPerfis: false,
   autoGerarIdNomus: true,
-  fixarProdutoGeral: false
+  fixarProdutoGeral: false,
+  formatoEtiquetaPadrao: '100x50'
 };
 
 export function getAppConfig(): AppConfig {
