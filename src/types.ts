@@ -1,5 +1,6 @@
 export type BumperType = 'ID' | 'OP';
 export type LabelFormat = '100x50' | '100x100_dupla' | '100x100_cheia';
+export type AppMode = 'fabrica' | 'pcp';
 
 export interface PerfilItem {
   id: string | number;

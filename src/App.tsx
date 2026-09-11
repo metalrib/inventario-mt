@@ -16,7 +16,7 @@ import { ScannerModal } from './components/ScannerModal';
 import { ScanResultModal } from './components/ScanResultModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MetricsDashboard } from './components/MetricsDashboard';
-import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, ProductCatalogItem, AppConfig } from './types';
+import { PerfilItem, BumperItem, GeralItem, ProfileCatalogItem, ProductCatalogItem, AppConfig, AppMode } from './types';
 import {
   subscribeToPerfis,
   subscribeToBumpers,
@@ -48,7 +48,14 @@ import {
 import { DEFAULT_PRODUCT_CATALOG } from './data/catalog';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('gerais');
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    const saved = localStorage.getItem('metalrib_app_mode') as AppMode;
+    return saved === 'pcp' ? 'pcp' : 'fabrica';
+  });
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const savedMode = localStorage.getItem('metalrib_app_mode');
+    return savedMode === 'pcp' ? 'bumpers' : 'gerais';
+  });
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [config, setConfig] = useState<AppConfig>(getAppConfig());
 
@@ -364,10 +371,42 @@ export default function App() {
     window.print();
   };
 
+  const handleModeChange = (mode: AppMode) => {
+    setAppMode(mode);
+    localStorage.setItem('metalrib_app_mode', mode);
+
+    if (mode === 'pcp') {
+      if (activeTab === 'perfis' || activeTab === 'gerais') {
+        setActiveTab('bumpers');
+      }
+      const savedPcpOperador = localStorage.getItem('metalrib_operador_pcp') || 'PCP';
+      const updated: AppConfig = {
+        ...config,
+        operadorPadrao: savedPcpOperador
+      };
+      setConfig(updated);
+      saveAppConfig(updated);
+    } else {
+      const savedFabricaOperador = localStorage.getItem('metalrib_operador_fabrica') || 'Operador Produção';
+      const updated: AppConfig = {
+        ...config,
+        operadorPadrao: savedFabricaOperador
+      };
+      setConfig(updated);
+      saveAppConfig(updated);
+    }
+  };
+
   const handleUpdateOperador = (newOperador: string) => {
+    const trimmed = newOperador.trim() || (appMode === 'pcp' ? 'PCP' : 'Operador Produção');
+    if (appMode === 'pcp') {
+      localStorage.setItem('metalrib_operador_pcp', trimmed);
+    } else {
+      localStorage.setItem('metalrib_operador_fabrica', trimmed);
+    }
     const updated: AppConfig = {
       ...config,
-      operadorPadrao: newOperador.trim() || 'Operador Produção'
+      operadorPadrao: trimmed
     };
     setConfig(updated);
     saveAppConfig(updated);
@@ -421,6 +460,8 @@ export default function App() {
         totalGeraisM2={totalGeraisM2}
         operador={config.operadorPadrao}
         onChangeOperador={handleUpdateOperador}
+        appMode={appMode}
+        onChangeMode={handleModeChange}
       />
 
       {/* Backup & History Bar */}
@@ -440,6 +481,8 @@ export default function App() {
         perfisCount={safePerfis.length}
         bumpersCount={safeBumpers.length}
         geraisCount={safeGerais.length}
+        appMode={appMode}
+        onChangeMode={handleModeChange}
       />
 
       {/* Main Tab Views */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Wifi, WifiOff, Settings, Camera, RefreshCw, BookOpen, User, Edit3, Check, X } from 'lucide-react';
+import { Wifi, WifiOff, Settings, Camera, RefreshCw, BookOpen, User, Edit3, Check, X, Layers, ClipboardList } from 'lucide-react';
+import { AppMode } from '../types';
 
 interface HeaderProps {
   isOnline: boolean;
@@ -14,6 +15,8 @@ interface HeaderProps {
   totalGeraisM2?: number;
   operador?: string;
   onChangeOperador?: (newOperador: string) => void;
+  appMode?: AppMode;
+  onChangeMode?: (newMode: AppMode) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   totalGeraisM2 = 0,
   operador = 'Operador Produção',
   onChangeOperador,
+  appMode = 'fabrica',
+  onChangeMode,
 }) => {
   const [isEditingOperador, setIsEditingOperador] = useState(false);
   const [tempOperador, setTempOperador] = useState(operador);
@@ -43,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 mb-3 shadow-sm flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3 w-full">
-      {/* Top / Left: Brand & Logo + Operador */}
+      {/* Top / Left: Brand & Logo + Mode Switcher + Operador */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Brand */}
         <div className="flex items-center gap-3">
@@ -58,16 +63,54 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div>
             <h1 className="text-base sm:text-lg font-extrabold text-[#1b367c] leading-tight flex items-center gap-2">
-              Inventário Produção
-              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 bg-blue-50 text-[#1b367c] border border-blue-200 rounded-full">
-                v2.5 Pro
+              {appMode === 'pcp' ? 'PCP • Controle de Produção' : 'Inventário Produção'}
+              <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border ${
+                appMode === 'pcp'
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200 font-extrabold'
+                  : 'bg-blue-50 text-[#1b367c] border-blue-200'
+              }`}>
+                {appMode === 'pcp' ? 'Módulo PCP' : 'v2.5 Pro'}
               </span>
             </h1>
             <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-              Controle de Estoque de Chapas, Insumos, Perfis & Bumpers
+              {appMode === 'pcp'
+                ? 'Controle, Apontamento e Etiquetas de Bumpers'
+                : 'Controle de Estoque de Chapas, Insumos, Perfis & Bumpers'}
             </p>
           </div>
         </div>
+
+        {/* Ambient / Mode Switcher (Fábrica vs PCP) */}
+        {onChangeMode && (
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-300 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => onChangeMode('fabrica')}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                appMode === 'fabrica'
+                  ? 'bg-[#1b367c] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+              title="Alternar para o Inventário Geral da Fábrica"
+            >
+              <Layers size={13} />
+              <span>Fábrica</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeMode('pcp')}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                appMode === 'pcp'
+                  ? 'bg-[#1b367c] text-white shadow-xs ring-1 ring-blue-300'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+              }`}
+              title="Alternar para o Módulo de Controle do PCP"
+            >
+              <ClipboardList size={13} />
+              <span>PCP</span>
+            </button>
+          </div>
+        )}
 
         {/* Operador / Responsável */}
         <div className="flex items-center gap-2 bg-amber-50/90 border border-amber-200 rounded-lg px-3 py-1.5 text-xs shadow-2xs">
