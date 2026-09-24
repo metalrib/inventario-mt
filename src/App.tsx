@@ -654,6 +654,10 @@ export default function App() {
       <ScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
+        onScanResult={(code) => {
+          setScannedCodeForModal(code);
+          setIsScanResultOpen(true);
+        }}
         onScan={(code) => {
           setScannedCodeForModal(code);
           setIsScanResultOpen(true);
@@ -668,9 +672,38 @@ export default function App() {
           setScannedCodeForModal(null);
         }}
         scannedCode={scannedCodeForModal}
-        perfis={perfis}
-        bumpers={bumpers}
-        gerais={gerais}
+        perfis={safePerfis}
+        bumpers={safeBumpers}
+        gerais={safeGerais}
+        productCatalog={safeCatalog}
+        appMode={appMode}
+        onAddPerfil={async (item) => {
+          await handleSavePerfil(item);
+        }}
+        onAddBumper={async (item) => {
+          await handleSaveBumper({
+            tipo: item.tipo || (item.codigo.toUpperCase().startsWith('OP') ? 'OP' : 'ID'),
+            codigo: item.codigo,
+            medida_mm: item.medida_mm,
+            quantidade: item.quantidade,
+            operador: item.operador || config.operadorPadrao
+          });
+        }}
+        onAddGeral={async (item) => {
+          await handleSaveGeral(item);
+        }}
+        onIncrementPerfil={async (id, qty) => {
+          await updatePerfil(id, { quantidade: qty });
+        }}
+        onIncrementBumper={async (id, qty) => {
+          await updateBumper(id, { quantidade: qty });
+        }}
+        onIncrementGeral={async (id, qty) => {
+          await updateGeral(id, { quantidade: qty });
+        }}
+        onNavigateToTab={(tab) => {
+          setActiveTab(tab);
+        }}
       />
 
       {/* Settings Modal */}

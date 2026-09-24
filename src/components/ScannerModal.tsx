@@ -1,18 +1,20 @@
 // Componente Modal do Leitor de QR Code e Código de Barras
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, Barcode, Check, RefreshCw, Zap, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, Barcode, Check, RefreshCw, Zap, Image as ImageIcon, Flashlight, AlertCircle } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, CameraDevice } from 'html5-qrcode';
 
 interface ScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanResult: (code: string) => void;
+  onScanResult?: (code: string) => void;
+  onScan?: (code: string) => void;
 }
 
 export const ScannerModal: React.FC<ScannerModalProps> = ({
   isOpen,
   onClose,
-  onScanResult
+  onScanResult,
+  onScan
 }) => {
   const [manualCode, setManualCode] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -20,8 +22,11 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   const playBeep = () => {
     try {
@@ -36,8 +41,22 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       gain.connect(audioCtx.destination);
       osc.start();
       osc.stop(audioCtx.currentTime + 0.12);
-    } catch (e) {
+    } catch {
       // Audio context might be restricted
+    }
+  };
+
+  const handleDispatchCode = (rawCode: string) => {
+    const trimmed = (rawCode || '').trim();
+    if (!trimmed) return;
+    playBeep();
+    stopCamera();
+    onClose();
+    if (onScanResult) {
+      onScanResult(trimmed);
+    }
+    if (onScan) {
+      onScan(trimmed);
     }
   };
 
@@ -67,11 +86,15 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     } else {
       stopCamera();
     }
+    return () => {
+      stopCamera();
+    };
   }, [isOpen]);
 
   const startCamera = async (overrideCameraId?: string) => {
     setScanError(null);
     setIsCameraActive(true);
+    setTorchOn(false);
 
     // Give DOM a tick to render #interactive-scanner
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -81,7 +104,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         if (scannerRef.current.isScanning) {
           try {
             await scannerRef.current.stop();
-          } catch (e) {
+          } catch {
             // Ignore
           }
         }
@@ -90,51 +113,64 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       }
 
       const scanConfig = {
-        fps: 10,
+        fps: 15,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const w = viewfinderWidth || 300;
+          const w = viewfinderWidth || 320;
           const h = viewfinderHeight || 300;
-          const minDim = Math.min(w, h);
-          const size = Math.max(180, Math.floor(minDim * 0.75));
-          return { width: size, height: size };
+          return {
+            width: Math.min(w - 20, Math.max(240, Math.floor(w * 0.88))),
+            height: Math.min(h - 20, Math.max(180, Math.floor(h * 0.7)))
+          };
         },
         formatsToSupport: [
           Html5QrcodeSupportedFormats.QR_CODE,
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.PDF_417
         ]
       };
 
       const targetCam = overrideCameraId || (cameras.length > 0 ? cameras[selectedCameraIndex]?.id : undefined);
-
-      let cameraConfig: any = targetCam ? { deviceId: { exact: targetCam } } : { facingMode: "environment" };
+      const cameraConfig: any = targetCam ? { deviceId: { exact: targetCam } } : { facingMode: "environment" };
 
       try {
         await scannerRef.current.start(
           cameraConfig,
           scanConfig,
           (decodedText) => {
-            playBeep();
-            onScanResult(decodedText);
-            stopCamera();
-            onClose();
+            handleDispatchCode(decodedText);
           },
           () => {}
         );
       } catch (firstErr) {
-        console.warn("First camera start failed, trying fallback facingMode string:", firstErr);
+        console.warn("Camera start with exact id failed, fallback to environment facingMode:", firstErr);
         await scannerRef.current.start(
           { facingMode: "environment" },
           scanConfig,
           (decodedText) => {
-            playBeep();
-            onScanResult(decodedText);
-            stopCamera();
-            onClose();
+            handleDispatchCode(decodedText);
           },
           () => {}
         );
+      }
+
+      // Check if torch/flashlight is supported
+      try {
+        const capabilities = scannerRef.current.getRunningTrackCameraCapabilities();
+        if (capabilities && (capabilities as any).torchFeature && (capabilities as any).torchFeature().isSupported()) {
+          setHasTorch(true);
+        } else {
+          setHasTorch(false);
+        }
+      } catch {
+        setHasTorch(false);
       }
 
       updateCameraList();
@@ -144,10 +180,23 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       setIsCameraActive(false);
       const msg = e?.message || e?.toString() || '';
       if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
-        setScanError("Acesso à câmera negado. Por favor, permita o acesso nas configurações do navegador.");
+        setScanError("Acesso à câmera negado. Por favor, permita o acesso à câmera no seu navegador.");
       } else {
-        setScanError("Não foi possível focar na câmera. Você também pode tirar uma foto do QR code usando o botão abaixo.");
+        setScanError("Não foi possível acessar a câmera. Você também pode enviar uma foto da etiqueta ou digitar o código abaixo.");
       }
+    }
+  };
+
+  const handleToggleTorch = async () => {
+    if (!scannerRef.current || !hasTorch) return;
+    try {
+      const newTorch = !torchOn;
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ torch: newTorch } as any]
+      });
+      setTorchOn(newTorch);
+    } catch (err) {
+      console.warn("Error toggling torch:", err);
     }
   };
 
@@ -157,6 +206,62 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     setSelectedCameraIndex(nextIndex);
     const nextCamId = cameras[nextIndex].id;
     await startCamera(nextCamId);
+  };
+
+  // Helper to downscale large smartphone photos before scanning
+  const resizeImageFile = async (file: File, maxDim = 1200): Promise<File | Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width <= maxDim && height <= maxDim) {
+          resolve(file);
+          return;
+        }
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.92);
+      };
+
+      img.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,15 +283,32 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         setIsCameraActive(false);
       }
 
-      const decodedResult = await html5QrCode.scanFile(file, true);
+      // First attempt: direct file
+      let decodedResult = '';
+      try {
+        decodedResult = await html5QrCode.scanFile(file, false);
+      } catch {
+        // Second attempt: downscaled image for high-res smartphone cameras
+        try {
+          const resizedBlob = await resizeImageFile(file, 1200);
+          const resizedFile = new File([resizedBlob], 'resized.jpg', { type: 'image/jpeg' });
+          decodedResult = await html5QrCode.scanFile(resizedFile, false);
+        } catch {
+          // Third attempt: smaller 800px image
+          const smallerBlob = await resizeImageFile(file, 800);
+          const smallerFile = new File([smallerBlob], 'smaller.jpg', { type: 'image/jpeg' });
+          decodedResult = await html5QrCode.scanFile(smallerFile, false);
+        }
+      }
+
       if (decodedResult) {
-        playBeep();
-        onScanResult(decodedResult);
-        onClose();
+        handleDispatchCode(decodedResult);
+      } else {
+        throw new Error("Código não identificado");
       }
     } catch (err) {
       console.warn("File scan failed:", err);
-      setScanError("Não foi possível ler o QR code na foto. Certifique-se de que a imagem esteja nítida.");
+      setScanError("Não foi possível ler o código na foto. Certifique-se de que a imagem esteja nítida ou digite o código/ID abaixo.");
     } finally {
       setIsProcessingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -207,26 +329,27 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     setIsCameraActive(false);
   };
 
-  if (!isOpen) return null;
-
   const handleApplyManual = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
-    playBeep();
-    onScanResult(manualCode.trim());
+    handleDispatchCode(manualCode.trim());
     setManualCode('');
-    onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 animate-in fade-in duration-150">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2">
-            <Barcode size={20} className="text-[#1b367c]" />
-            <h2 className="text-base font-extrabold text-[#1b367c]">
-              Leitor de Código / QR Code
-            </h2>
+            <Barcode size={22} className="text-[#1b367c]" />
+            <div>
+              <h2 className="text-base font-extrabold text-[#1b367c] leading-tight">
+                Leitor de QR Code e Código de Barras
+              </h2>
+              <p className="text-[11px] text-slate-500 font-medium">Inventário Metalrib</p>
+            </div>
           </div>
           <button
             type="button"
@@ -237,9 +360,9 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-3.5">
           {/* Camera View Area */}
-          <div className="relative bg-slate-950 rounded-xl overflow-hidden min-h-[260px] flex flex-col items-center justify-center border border-slate-800 shadow-inner">
+          <div className="relative bg-slate-950 rounded-xl overflow-hidden min-h-[270px] flex flex-col items-center justify-center border border-slate-800 shadow-inner">
             <style>{`
               #interactive-scanner video {
                 width: 100% !important;
@@ -255,29 +378,50 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
               }
             `}</style>
 
-            <div id="interactive-scanner" className="w-full min-h-[260px] relative z-0 bg-slate-950 flex items-center justify-center" />
+            <div id="interactive-scanner" className="w-full min-h-[270px] relative z-0 bg-slate-950 flex items-center justify-center" />
 
-            {isCameraActive && cameras.length > 1 && (
-              <button
-                type="button"
-                onClick={handleSwitchCamera}
-                className="absolute top-3 right-3 bg-slate-900/90 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 shadow-lg backdrop-blur-sm z-20 cursor-pointer"
-              >
-                <RefreshCw size={14} className="animate-spin-slow" />
-                <span>Trocar Câmera</span>
-              </button>
+            {/* In-camera Controls */}
+            {isCameraActive && (
+              <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
+                {hasTorch && (
+                  <button
+                    type="button"
+                    onClick={handleToggleTorch}
+                    className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border flex items-center gap-1 shadow-lg backdrop-blur-sm cursor-pointer transition-colors ${
+                      torchOn 
+                        ? 'bg-amber-500 text-slate-950 border-amber-400' 
+                        : 'bg-slate-900/90 text-white border-slate-700 hover:bg-black'
+                    }`}
+                  >
+                    <Flashlight size={14} className={torchOn ? 'fill-slate-950' : ''} />
+                    <span>{torchOn ? 'Lanterna Ligada' : 'Lanterna'}</span>
+                  </button>
+                )}
+
+                {cameras.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleSwitchCamera}
+                    className="bg-slate-900/90 hover:bg-black text-white text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1 shadow-lg backdrop-blur-sm cursor-pointer"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Câmera</span>
+                  </button>
+                )}
+              </div>
             )}
 
             {!isCameraActive && (
               <div className="absolute inset-0 z-10 bg-slate-950 text-center p-6 text-slate-400 flex flex-col items-center justify-center">
                 <Camera size={40} className="mx-auto mb-2 text-slate-500 animate-pulse" />
                 <p className="text-xs font-semibold mb-3 text-slate-300">
-                  Aponte a câmera para o QR Code ou Código de Barras
+                  Aponte a câmera para o QR Code ou Código de Barras da etiqueta
                 </p>
                 {scanError && (
-                  <p className="text-xs text-rose-400 bg-rose-950/70 border border-rose-800 p-2.5 rounded-lg mb-3 max-w-xs text-center font-medium">
-                    {scanError}
-                  </p>
+                  <div className="text-xs text-rose-300 bg-rose-950/80 border border-rose-800 p-2.5 rounded-lg mb-3 max-w-xs text-left font-medium flex items-start gap-2">
+                    <AlertCircle size={16} className="text-rose-400 shrink-0 mt-0.5" />
+                    <span>{scanError}</span>
+                  </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
                   <button
@@ -301,10 +445,20 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             )}
           </div>
 
-          <p className="text-[11px] text-center font-bold text-slate-600 bg-slate-100 p-2.5 rounded-lg border border-slate-200 flex items-center justify-center gap-1.5">
-            <Zap size={14} className="text-amber-500 fill-amber-500" />
-            <span>Mantenha o QR Code bem iluminado e centralizado na tela</span>
-          </p>
+          <div className="flex items-center justify-between text-[11px] text-slate-600 bg-slate-100 p-2.5 rounded-lg border border-slate-200">
+            <span className="flex items-center gap-1.5 font-bold">
+              <Zap size={14} className="text-amber-500 fill-amber-500 shrink-0" />
+              <span>Aponte para o QR Code ou Código de Barras</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[#1b367c] hover:underline font-extrabold text-[11px] inline-flex items-center gap-1 cursor-pointer"
+            >
+              <ImageIcon size={13} />
+              <span>Usar Foto</span>
+            </button>
+          </div>
 
           {/* Hidden File Input for Foto/Galeria */}
           <input
@@ -317,35 +471,38 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
           />
 
           {isProcessingImage && (
-            <p className="text-xs text-center font-bold text-[#1b367c] animate-pulse">
-              Processando foto do QR code...
-            </p>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <p className="text-xs font-bold text-[#1b367c] animate-pulse">
+                🔍 Processando foto da etiqueta e decodificando...
+              </p>
+            </div>
           )}
 
-          {/* Quick Scanner Manual Input */}
+          {/* Quick Scanner Manual Input / Barcode Gun */}
           <form onSubmit={handleApplyManual} className="space-y-2 pt-1 border-t border-slate-100">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-600 uppercase">
-                Leitor USB / Digitação Manual
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Digitação Manual / Bipador USB
               </label>
               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold border border-emerald-200">
-                Bipador Pronto
+                Pronto para bipar
               </span>
             </div>
             <div className="flex gap-2">
               <input
+                ref={manualInputRef}
                 type="text"
                 value={manualCode}
                 onChange={e => setManualCode(e.target.value)}
-                placeholder="Escaneie com leitor USB ou digite..."
-                className="flex-1 h-11 px-3 border-2 border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-[#1b367c]"
+                placeholder="Cole ou digite ID Nomus, Código ou JSON..."
+                className="flex-1 h-10 px-3 border-2 border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#1b367c]"
               />
               <button
                 type="submit"
                 className="bg-[#1b367c] hover:bg-[#13275b] text-white font-extrabold text-xs px-4 rounded-lg flex items-center gap-1 shadow-sm cursor-pointer"
               >
                 <Check size={16} />
-                <span>Usar</span>
+                <span>Buscar</span>
               </button>
             </div>
           </form>
@@ -354,6 +511,3 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     </div>
   );
 };
-
-
-
