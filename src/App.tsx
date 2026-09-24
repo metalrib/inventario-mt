@@ -329,6 +329,12 @@ export default function App() {
       codigoItem: item.codigo_item,
       descricaoItem: item.descricao_item,
       medidaFormatted: dim,
+      medidaMm: item.comprimento_mm || 0,
+      comprimentoMm: item.comprimento_mm || 0,
+      larguraMm: item.largura_mm || 0,
+      espessuraMm: item.espessura_mm || 0,
+      unidade: item.unidade || '',
+      quantidade: item.quantidade || 1,
     }]);
     setIsPrintModalOpen(true);
   };
@@ -340,6 +346,12 @@ export default function App() {
       codigoItem: g.codigo_item,
       descricaoItem: g.descricao_item,
       medidaFormatted: formatGeralDimension(g),
+      medidaMm: g.comprimento_mm || 0,
+      comprimentoMm: g.comprimento_mm || 0,
+      larguraMm: g.largura_mm || 0,
+      espessuraMm: g.espessura_mm || 0,
+      unidade: g.unidade || '',
+      quantidade: g.quantidade || 1,
     }));
     setPrintItems(formatted);
     setIsPrintModalOpen(true);
@@ -691,6 +703,15 @@ export default function App() {
         }}
         onAddGeral={async (item) => {
           await handleSaveGeral(item);
+        }}
+        onUpdatePerfil={async (id, data) => {
+          await handleEditPerfil(id, data);
+        }}
+        onUpdateBumper={async (id, data) => {
+          await handleEditBumper(id, data);
+        }}
+        onUpdateGeral={async (id, data) => {
+          await handleEditGeral(id, data);
         }}
         onIncrementPerfil={async (id, qty) => {
           await updatePerfil(id, { quantidade: qty });

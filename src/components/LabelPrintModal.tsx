@@ -146,8 +146,13 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
         id_nomus: idVal,
         codigo: itemCode,
         desc: itemDesc,
-        medida_mm: item.medidaMm || 0,
-        medida: displayMedida
+        medida_mm: item.medidaMm || item.comprimentoMm || 0,
+        medida: displayMedida,
+        comprimento_mm: item.comprimentoMm || (item as any).comprimento_mm || 0,
+        largura_mm: item.larguraMm || (item as any).largura_mm || 0,
+        espessura_mm: item.espessuraMm || (item as any).espessura_mm || 0,
+        unidade: item.unidade || '',
+        quantidade: item.quantidade || 1
       };
       const codeToEncode = JSON.stringify(payloadObj);
       const qrImg = await generateQRCodeBase64(codeToEncode, labelFormat === '100x100_cheia' ? 300 : 200);
