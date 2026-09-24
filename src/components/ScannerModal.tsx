@@ -19,6 +19,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [isPermissionDenied, setIsPermissionDenied] = useState(false);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
@@ -176,13 +177,14 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       updateCameraList();
 
     } catch (e: any) {
-      console.error("Camera start error:", e);
       setIsCameraActive(false);
       const msg = e?.message || e?.toString() || '';
-      if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
-        setScanError("Acesso à câmera negado. Por favor, permita o acesso à câmera no seu navegador.");
+      console.warn("Camera start notice:", msg);
+      if (msg.includes('NotAllowedError') || msg.includes('Permission') || e?.name === 'NotAllowedError') {
+        setIsPermissionDenied(true);
+        setScanError("Permissão de câmera bloqueada no navegador.");
       } else {
-        setScanError("Não foi possível acessar a câmera. Você também pode enviar uma foto da etiqueta ou digitar o código abaixo.");
+        setScanError("Não foi possível acessar a câmera. Você pode tirar uma foto da etiqueta ou digitar o código abaixo.");
       }
     }
   };
@@ -412,35 +414,72 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             )}
 
             {!isCameraActive && (
-              <div className="absolute inset-0 z-10 bg-slate-950 text-center p-6 text-slate-400 flex flex-col items-center justify-center">
-                <Camera size={40} className="mx-auto mb-2 text-slate-500 animate-pulse" />
-                <p className="text-xs font-semibold mb-3 text-slate-300">
-                  Aponte a câmera para o QR Code ou Código de Barras da etiqueta
-                </p>
-                {scanError && (
-                  <div className="text-xs text-rose-300 bg-rose-950/80 border border-rose-800 p-2.5 rounded-lg mb-3 max-w-xs text-left font-medium flex items-start gap-2">
-                    <AlertCircle size={16} className="text-rose-400 shrink-0 mt-0.5" />
-                    <span>{scanError}</span>
+              <div className="absolute inset-0 z-10 bg-slate-950 text-center p-5 text-slate-300 flex flex-col items-center justify-center">
+                {isPermissionDenied ? (
+                  <div className="space-y-3 max-w-xs text-center">
+                    <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/40">
+                      <Camera size={26} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white">Permissão da Câmera Bloqueada</h4>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                        O navegador bloqueou o vídeo em tempo real. Você pode <strong>Tirar Foto</strong> diretamente ou liberar a câmera no ícone de cadeado na barra do navegador.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 px-3 rounded-xl transition-colors shadow-md inline-flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <ImageIcon size={16} />
+                        <span>📷 Tirar Foto da Etiqueta</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPermissionDenied(false);
+                          startCamera();
+                        }}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold py-2 px-3 rounded-xl transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <RefreshCw size={14} />
+                        <span>Tentar Abrir Câmera Novamente</span>
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <Camera size={40} className="mx-auto mb-2 text-slate-500 animate-pulse" />
+                    <p className="text-xs font-semibold mb-3 text-slate-300">
+                      Aponte a câmera para o QR Code ou Código de Barras da etiqueta
+                    </p>
+                    {scanError && (
+                      <div className="text-xs text-rose-300 bg-rose-950/80 border border-rose-800 p-2.5 rounded-lg mb-3 max-w-xs text-left font-medium flex items-start gap-2">
+                        <AlertCircle size={16} className="text-rose-400 shrink-0 mt-0.5" />
+                        <span>{scanError}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+                      <button
+                        type="button"
+                        onClick={() => startCamera()}
+                        className="flex-1 bg-[#1b367c] hover:bg-[#13275b] text-white text-xs font-extrabold py-2.5 px-3 rounded-lg transition-colors shadow-md inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Camera size={16} />
+                        <span>Abrir Câmera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-extrabold py-2.5 px-3 rounded-lg transition-colors shadow-md inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ImageIcon size={16} />
+                        <span>Tirar/Enviar Foto</span>
+                      </button>
+                    </div>
+                  </>
                 )}
-                <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
-                  <button
-                    type="button"
-                    onClick={() => startCamera()}
-                    className="flex-1 bg-[#1b367c] hover:bg-[#13275b] text-white text-xs font-extrabold py-2.5 px-3 rounded-lg transition-colors shadow-md inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Camera size={16} />
-                    <span>Abrir Câmera</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-extrabold py-2.5 px-3 rounded-lg transition-colors shadow-md inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ImageIcon size={16} />
-                    <span>Tirar/Enviar Foto</span>
-                  </button>
-                </div>
               </div>
             )}
           </div>
