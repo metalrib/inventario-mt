@@ -186,6 +186,7 @@ export default function App() {
     medida_mm: number;
     quantidade: number;
     operador?: string;
+    id_nomus?: string;
   }) => {
     const saved = await addBumper({
       ...data,
@@ -683,6 +684,11 @@ export default function App() {
           setIsScanResultOpen(false);
           setScannedCodeForModal(null);
         }}
+        onScanNext={() => {
+          setIsScanResultOpen(false);
+          setScannedCodeForModal(null);
+          setIsScannerOpen(true);
+        }}
         scannedCode={scannedCodeForModal}
         perfis={safePerfis}
         bumpers={safeBumpers}
@@ -698,7 +704,8 @@ export default function App() {
             codigo: item.codigo,
             medida_mm: item.medida_mm,
             quantidade: item.quantidade,
-            operador: item.operador || config.operadorPadrao
+            operador: item.operador || config.operadorPadrao,
+            id_nomus: item.id_nomus
           });
         }}
         onAddGeral={async (item) => {
