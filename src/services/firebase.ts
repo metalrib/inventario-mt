@@ -509,6 +509,32 @@ export async function updateGeral(id: string | number, updates: Partial<GeralIte
   saveLocalGerais(updated);
 }
 
+export async function updateMultipleGerais(updates: { id: string | number; changes: Partial<GeralItem> }[]): Promise<void> {
+  if (!updates || updates.length === 0) return;
+  try {
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const chunk = updates.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        const docRef = doc(db, COL_GERAIS, String(item.id));
+        batch.set(docRef, item.changes, { merge: true });
+      }
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar lote de itens gerais no Firebase:', err);
+  }
+
+  const current = getLocalGerais();
+  const updateMap = new Map(updates.map(u => [String(u.id), u.changes]));
+  const updatedList = current.map(item => {
+    const changes = updateMap.get(String(item.id));
+    return changes ? { ...item, ...changes } : item;
+  });
+  saveLocalGerais(updatedList);
+}
+
 export async function deleteGeral(id: string | number): Promise<void> {
   const docId = String(id);
   try {

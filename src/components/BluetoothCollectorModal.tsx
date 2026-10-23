@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   X, 
   Zap, 
@@ -83,6 +83,9 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
     const saved = localStorage.getItem('metalrib_collector_auto_mode');
     return saved !== null ? saved === 'true' : true;
   });
+  const [activeBatchProductCode, setActiveBatchProductCode] = useState<string>(() => {
+    return localStorage.getItem('metalrib_collector_batch_product') || '023.0116';
+  });
   const [sessionHistory, setSessionHistory] = useState<ScanSessionItem[]>([]);
   const [lastFeedback, setLastFeedback] = useState<{
     type: 'success' | 'info' | 'error';
@@ -94,6 +97,27 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackTimerRef = useRef<any>(null);
+
+  // Full unified catalog
+  const allCatalog = useMemo(() => {
+    const list = [...(productCatalog || []), ...DEFAULT_PRODUCT_CATALOG];
+    const map = new Map<string, ProductCatalogItem>();
+    for (const it of list) {
+      if (it?.codigo) map.set(it.codigo.trim().toUpperCase(), it);
+    }
+    return Array.from(map.values());
+  }, [productCatalog]);
+
+  const activeBatchProduct = useMemo(() => {
+    if (!activeBatchProductCode || activeBatchProductCode === 'AUTO') return null;
+    return allCatalog.find(c => c.codigo.trim().toUpperCase() === activeBatchProductCode.trim().toUpperCase()) || null;
+  }, [allCatalog, activeBatchProductCode]);
+
+  const handleSelectBatchProduct = (code: string) => {
+    setActiveBatchProductCode(code);
+    localStorage.setItem('metalrib_collector_batch_product', code);
+    claimFocus();
+  };
 
   // Auto-focus retention: Keep the hidden/active input focused so Bluetooth gun keystrokes land immediately
   const claimFocus = useCallback(() => {
@@ -148,6 +172,11 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
       const cleanCode = (parsed.codigoItem || '').trim().toLowerCase();
       const qtyToAdd = parsed.quantidade > 0 ? parsed.quantidade : 1;
 
+      const matchedCatalog = allCatalog.find(c => 
+        (cleanCode && (c.codigo || '').trim().toLowerCase() === cleanCode) ||
+        (cleanId && (c.codigo || '').trim().toLowerCase() === cleanId)
+      );
+
       // 1. Check if matches existing GERAL / CHAPA
       const existingGeral = gerais.find(g => {
         // If scan contains a specific Nomus ID, match ONLY against that same ID
@@ -190,15 +219,24 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         return false;
       });
 
-      // CASE A-HEAL: If existing item was saved as ITEM-xxxx (e.g. from earlier scan issue) and we now have the true product code
-      if (existingGeral && (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-') && parsed.codigoItem) {
+      // CASE A-HEAL: If existing item was saved as ITEM-xxxx (e.g. from earlier scan issue) and we now have the true product code or active batch product
+      const effectiveBatchProd = matchedCatalog || activeBatchProduct;
+      if (existingGeral && (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-') && (parsed.codigoItem || effectiveBatchProd)) {
+        const healCode = parsed.codigoItem || effectiveBatchProd?.codigo || '';
+        const healDesc = parsed.descItem || effectiveBatchProd?.descricao || existingGeral.descricao_item;
+        const healComp = parsed.comprimentoMm || effectiveBatchProd?.comprimento_padrao_mm || existingGeral.comprimento_mm || 0;
+        const healLarg = parsed.larguraMm || effectiveBatchProd?.largura_padrao_mm || existingGeral.largura_mm || 0;
+        const healEsp = parsed.espessuraMm || effectiveBatchProd?.espessura_padrao_mm || existingGeral.espessura_mm || 0;
+        const healUnidade = effectiveBatchProd?.unidade || existingGeral.unidade || (healLarg > 0 ? 'm²' : 'unidade');
+
         const updatePayload: Partial<GeralItem> = {
-          codigo_item: parsed.codigoItem,
-          descricao_item: parsed.descItem || existingGeral.descricao_item,
+          codigo_item: healCode,
+          descricao_item: healDesc,
+          comprimento_mm: healComp,
+          largura_mm: healLarg,
+          espessura_mm: healEsp,
+          unidade: healUnidade
         };
-        if (parsed.comprimentoMm) updatePayload.comprimento_mm = parsed.comprimentoMm;
-        if (parsed.larguraMm) updatePayload.largura_mm = parsed.larguraMm;
-        if (parsed.espessuraMm) updatePayload.espessura_mm = parsed.espessuraMm;
 
         await onUpdateGeral(existingGeral.id, updatePayload);
         if (soundEnabled) playBeepDouble();
@@ -210,15 +248,15 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
           action: 'incremented',
           itemType: 'geral',
           itemId: existingGeral.id,
-          codigo: parsed.codigoItem,
-          descricao: parsed.descItem || existingGeral.descricao_item,
+          codigo: healCode,
+          descricao: healDesc,
           idNomus: existingGeral.id_nomus,
-          medidaFormatted: `${parsed.comprimentoMm || existingGeral.comprimento_mm}x${parsed.larguraMm || existingGeral.largura_mm}mm`,
+          medidaFormatted: `${healComp}x${healLarg}${healEsp ? `x${healEsp}` : ''}mm`,
           quantityAdded: 0,
           newTotalQuantity: Number(existingGeral.quantidade) || 1,
         };
         setSessionHistory(prev => [historyItem, ...prev]);
-        triggerFeedback('success', `Item Corrigido para ${parsed.codigoItem}!`, `${parsed.descItem || 'Chapa'} atualizada com sucesso`);
+        triggerFeedback('success', `Item Corrigido para ${healCode}!`, `${healDesc} atualizada com sucesso`);
         return;
       }
 
@@ -305,12 +343,8 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
       }
 
       // CASE B: Item is NEW in Inventory
-      // Check if code matches Product Catalog or is full QR Code with specs
-      const allCatalog = [...(productCatalog || []), ...DEFAULT_PRODUCT_CATALOG];
-      const matchedCatalog = allCatalog.find(c => 
-        (cleanCode && (c.codigo || '').trim().toLowerCase() === cleanCode) ||
-        (cleanId && (c.codigo || '').trim().toLowerCase() === cleanId)
-      );
+      // Determine Product: from Scan, Matched Catalog, or Active Batch Product
+      const effectiveProd = matchedCatalog || (activeBatchProductCode !== 'AUTO' ? activeBatchProduct : null);
 
       // Determine Category
       let targetCat: 'geral' | 'perfil' | 'bumper' = 'geral';
@@ -318,18 +352,18 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         targetCat = 'bumper';
       } else if (parsed.categoriaHint === 'perfil') {
         targetCat = 'perfil';
-      } else if (parsed.categoriaHint === 'geral' || parsed.larguraMm > 0) {
-        targetCat = 'geral';
-      } else if (matchedCatalog?.categoria?.toLowerCase().includes('perfil')) {
+      } else if (effectiveProd?.categoria?.toLowerCase().includes('perfil')) {
         targetCat = 'perfil';
+      } else if (parsed.categoriaHint === 'geral' || parsed.larguraMm > 0 || (effectiveProd?.largura_padrao_mm || 0) > 0) {
+        targetCat = 'geral';
       }
 
-      const finalCodigo = parsed.codigoItem || matchedCatalog?.codigo || '';
-      const finalDesc = parsed.descItem || matchedCatalog?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : ''));
-      const finalComprimento = parsed.comprimentoMm || matchedCatalog?.comprimento_padrao_mm || matchedCatalog?.medida_padrao_mm || 0;
-      const finalLargura = parsed.larguraMm || matchedCatalog?.largura_padrao_mm || 0;
-      const finalEspessura = parsed.espessuraMm || matchedCatalog?.espessura_padrao_mm || 0;
-      const finalNomus = parsed.idNomus || generateNomusIdSequence(1)[0];
+      const finalCodigo = parsed.codigoItem || effectiveProd?.codigo || '';
+      const finalDesc = parsed.descItem || effectiveProd?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : ''));
+      const finalComprimento = parsed.comprimentoMm || effectiveProd?.comprimento_padrao_mm || effectiveProd?.medida_padrao_mm || 0;
+      const finalLargura = parsed.larguraMm || effectiveProd?.largura_padrao_mm || 0;
+      const finalEspessura = parsed.espessuraMm || effectiveProd?.espessura_padrao_mm || 0;
+      const finalNomus = cleanId || parsed.idNomus || generateNomusIdSequence(1)[0];
 
       if (autoProcessMode && finalCodigo) {
         // Auto-register new item with true product code
@@ -342,7 +376,7 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
             largura_mm: finalLargura,
             espessura_mm: finalEspessura,
             quantidade: qtyToAdd,
-            unidade: parsed.unidade || (finalLargura > 0 ? 'm²' : 'unidade'),
+            unidade: parsed.unidade || effectiveProd?.unidade || (finalLargura > 0 ? 'm²' : 'unidade'),
             operador: operadorPadrao
           });
         } else if (targetCat === 'perfil') {
@@ -507,6 +541,56 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
         {/* Status & Hidden Active Input Bar */}
         <div className="p-4 space-y-3 shrink-0 bg-slate-50 border-b border-slate-200">
+          {/* Active Batch Product Selection */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3 shadow-xs space-y-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-[#1b367c] text-white rounded-lg shadow-xs shrink-0">
+                  <Tag size={14} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-[#1b367c] uppercase tracking-wide">
+                      Produto da Coleta em Lote
+                    </span>
+                    {activeBatchProduct && (
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">
+                        ATIVO
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    {activeBatchProduct 
+                      ? `Todo código Nomus lido (ex: 2026.08.21.xxxx) será gravado como ${activeBatchProduct.codigo} (${activeBatchProduct.comprimento_padrao_mm}x${activeBatchProduct.largura_padrao_mm}mm)`
+                      : 'Somente salva se o código de barras contiver especificações completas'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full sm:w-auto shrink-0">
+                <select
+                  value={activeBatchProductCode}
+                  onChange={e => handleSelectBatchProduct(e.target.value)}
+                  className="w-full sm:w-64 h-9 px-2.5 bg-white border-2 border-blue-300 text-xs font-black text-slate-800 rounded-lg shadow-xs focus:outline-none focus:border-[#1b367c] focus:ring-1 focus:ring-blue-200 cursor-pointer"
+                >
+                  <option value="023.0116">023.0116 - CHAPA INOX 304 ESC (1740x850x0.5)</option>
+                  <option value="020.0093">020.0093 - CHAPA BR 0,43 - M2</option>
+                  <option value="023.0105">023.0105 - CHAPA AC FQ 3000x1200x12.50</option>
+                  <option value="023.0096">023.0096 - CHAPA AC FQ 3000x1200x2.65</option>
+                  <option value="022.0017">022.0017 - PERFIL VAI E VEM</option>
+                  <option value="AUTO">⚡ Automático (Somente Código nas Barras)</option>
+                  {allCatalog
+                    .filter(c => !['023.0116', '020.0093', '023.0105', '023.0096', '022.0017'].includes(c.codigo))
+                    .map(c => (
+                      <option key={c.id || c.codigo} value={c.codigo}>
+                        {c.codigo} - {c.descricao}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Main Visual Trigger Zone */}
           <div 
             onClick={claimFocus}

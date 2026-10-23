@@ -36,6 +36,7 @@ import {
   addGeral,
   addMultipleGerais,
   updateGeral,
+  updateMultipleGerais,
   deleteGeral,
   saveCatalogProduct,
   deleteCatalogProduct,
@@ -305,6 +306,15 @@ export default function App() {
 
   const handleEditGeral = async (id: string | number, updated: Partial<GeralItem>) => {
     await updateGeral(id, updated);
+  };
+
+  const handleUpdateBatchGerais = async (updates: { id: string | number; changes: Partial<GeralItem> }[]) => {
+    const updateMap = new Map(updates.map(u => [String(u.id), u.changes]));
+    setGerais(prev => prev.map(item => {
+      const ch = updateMap.get(String(item.id));
+      return ch ? { ...item, ...ch } : item;
+    }));
+    await updateMultipleGerais(updates);
   };
 
   const handleDeleteGeral = async (id: string | number) => {
@@ -681,6 +691,7 @@ export default function App() {
             <div className="w-full">
               <GeralTable
                 gerais={gerais}
+                productCatalog={safeCatalog}
                 onEditGeral={handleEditGeral}
                 onDeleteGeral={handleDeleteGeral}
                 onDeleteItem={handleDeleteGeral}
@@ -689,6 +700,7 @@ export default function App() {
                 onPrintSingle={handlePrintSingleGeral}
                 onPrintBatch={handlePrintBatchGerais}
                 onDeleteBatch={handleDeleteBatchGerais}
+                onUpdateBatchGerais={handleUpdateBatchGerais}
               />
             </div>
           </div>

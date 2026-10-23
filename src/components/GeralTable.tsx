@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { GeralItem, FilterState } from '../types';
-import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square, Filter, Layers, CheckCircle, ChevronRight, Eye } from 'lucide-react';
+import { GeralItem, FilterState, ProductCatalogItem } from '../types';
+import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square, Filter, Layers, CheckCircle, ChevronRight, Eye, Sparkles, CheckCircle2, Wand2 } from 'lucide-react';
 import { exportGeraisXLSX } from '../services/exporter';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
+import { DEFAULT_PRODUCT_CATALOG } from '../data/catalog';
 
 interface GeralTableProps {
   items?: GeralItem[];
   gerais?: GeralItem[];
+  productCatalog?: ProductCatalogItem[];
   onRefresh?: () => void;
   onDeleteItem?: (id: string | number) => void | Promise<void>;
   onDeleteGeral?: (id: string | number) => void | Promise<void>;
@@ -15,6 +17,7 @@ interface GeralTableProps {
   onClearGerais?: () => void | Promise<void>;
   onUpdateItem?: (id: string | number, updated: Partial<GeralItem>) => void | Promise<void>;
   onEditGeral?: (id: string | number, updated: Partial<GeralItem>) => void | Promise<void>;
+  onUpdateBatchGerais?: (updates: { id: string | number; changes: Partial<GeralItem> }[]) => void | Promise<void>;
   onOpenBatchPrint?: (items: GeralItem[]) => void;
   onPrintBatch?: (items: GeralItem[]) => void;
   onOpenSinglePrint?: (item: GeralItem) => void;
@@ -26,6 +29,7 @@ interface GeralTableProps {
 export const GeralTable: React.FC<GeralTableProps> = ({
   items,
   gerais,
+  productCatalog,
   onRefresh,
   onDeleteItem,
   onDeleteGeral,
@@ -34,6 +38,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   onClearGerais,
   onUpdateItem,
   onEditGeral,
+  onUpdateBatchGerais,
   onOpenBatchPrint,
   onPrintBatch,
   onOpenSinglePrint,
@@ -55,6 +60,73 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   // Product Code Separation / Focus Mode State (Option A)
   const [selectedProductCode, setSelectedProductCode] = useState<string | null>(initialProductCodeFilter);
   const [codeFilterSearch, setCodeFilterSearch] = useState<string>('');
+
+  // Batch Correction Tool for Provisional Codes (ITEM-XXXX)
+  const [isFixingBatch, setIsFixingBatch] = useState(false);
+  const [isBatchFixModalOpen, setIsBatchFixModalOpen] = useState(false);
+  const [batchFixSelectedProduct, setBatchFixSelectedProduct] = useState('023.0116');
+  const [batchSuccessMsg, setBatchSuccessMsg] = useState<string | null>(null);
+
+  const provisionalItems = useMemo(() => {
+    return itemList.filter(item => {
+      if (!item) return false;
+      const code = (item.codigo_item || '').trim().toUpperCase();
+      return code.startsWith('ITEM-') || code === 'SEM-CODIGO' || code === 'ITEM' || !code;
+    });
+  }, [itemList]);
+
+  const allAvailableCatalog = useMemo(() => {
+    const list = [...(productCatalog || []), ...DEFAULT_PRODUCT_CATALOG];
+    const map = new Map<string, ProductCatalogItem>();
+    for (const it of list) {
+      if (it?.codigo) map.set(it.codigo.trim().toUpperCase(), it);
+    }
+    return Array.from(map.values());
+  }, [productCatalog]);
+
+  const handleBatchFixProvisional = async (targetProductCode: string) => {
+    if (provisionalItems.length === 0) return;
+    setIsFixingBatch(true);
+    try {
+      const targetProduct = allAvailableCatalog.find(c => c.codigo.trim().toUpperCase() === targetProductCode.trim().toUpperCase()) || {
+        codigo: '023.0116',
+        descricao: 'CHAPA INOX 304 ESC - M2',
+        comprimento_padrao_mm: 1740,
+        largura_padrao_mm: 850,
+        espessura_padrao_mm: 0.50,
+        unidade: 'm²'
+      };
+
+      const updates = provisionalItems.map(item => ({
+        id: item.id,
+        changes: {
+          codigo_item: targetProduct.codigo,
+          descricao_item: targetProduct.descricao,
+          comprimento_mm: targetProduct.comprimento_padrao_mm || item.comprimento_mm || 0,
+          largura_mm: targetProduct.largura_padrao_mm || item.largura_mm || 0,
+          espessura_mm: targetProduct.espessura_padrao_mm || item.espessura_mm || 0,
+          unidade: targetProduct.unidade || item.unidade || 'm²'
+        }
+      }));
+
+      if (onUpdateBatchGerais) {
+        await onUpdateBatchGerais(updates);
+      } else {
+        for (const u of updates) {
+          await handleUpdate(u.id, u.changes);
+        }
+      }
+
+      setBatchSuccessMsg(`${provisionalItems.length} chapa(s) vinculadas com sucesso ao código ${targetProduct.codigo}!`);
+      setTimeout(() => setBatchSuccessMsg(null), 6000);
+      setIsBatchFixModalOpen(false);
+      handleSetProductCode(targetProduct.codigo);
+    } catch (err) {
+      console.error('Erro na correção em lote:', err);
+    } finally {
+      setIsFixingBatch(false);
+    }
+  };
 
   // Handle setting product code and notifying parent if provided
   const handleSetProductCode = (code: string | null) => {
@@ -388,6 +460,68 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           </button>
         )}
       </div>
+
+      {/* Batch Success Notification */}
+      {batchSuccessMsg && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+            <span>{batchSuccessMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBatchSuccessMsg(null)}
+            className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Provisional Items Batch Correction Banner */}
+      {provisionalItems.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+              <Sparkles size={20} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-amber-950 text-sm sm:text-base">
+                  {provisionalItems.length} {provisionalItems.length === 1 ? 'Chapa com Código Provisório' : 'Chapas com Código Provisório (ITEM-XXXX)'}
+                </h3>
+                <span className="text-[11px] font-extrabold px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md">
+                  Ação Rápida em Massa
+                </span>
+              </div>
+              <p className="text-xs text-amber-900 mt-1 leading-relaxed">
+                Estas chapas foram gravadas ao bipar o código de barras físico que continha apenas o ID Nomus (ex: <strong className="font-mono bg-amber-100 px-1 rounded">{provisionalItems[0]?.id_nomus || '2026.08.21.xxxx'}</strong>). 
+                Deseja vincular todas elas em 1 clique ao produto correto mantendo os IDs individuais de cada chapa?
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0 justify-end">
+            <button
+              type="button"
+              onClick={() => handleBatchFixProvisional('023.0116')}
+              disabled={isFixingBatch}
+              className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <CheckCircle2 size={16} />
+              <span>{isFixingBatch ? 'Atualizando...' : `⚡ Corrigir Todas para 023.0116 (Inox 304)`}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBatchFixModalOpen(true)}
+              disabled={isFixingBatch}
+              className="w-full sm:w-auto px-3 py-2.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span>Outro Produto...</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Product Code Selector Bar (Opção A - Pastas / Abas por Código de Produto) */}
       {productGroups.length > 0 && (
@@ -994,6 +1128,73 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         onClose={() => setIsClearAllModalOpen(false)}
         isDeleting={isDeleting}
       />
+
+      {/* Batch Fix Modal for selecting any Catalog Product */}
+      {isBatchFixModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-5 border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                <Wand2 size={18} className="text-[#1b367c]" />
+                <span>Vincular {provisionalItems.length} Chapas em Massa</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsBatchFixModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Selecione o produto do catálogo que será aplicado a todas as <strong className="text-slate-900 font-extrabold">{provisionalItems.length} chapas</strong> com código provisório. As dimensões e descrição serão preenchidas automaticamente e os IDs Nomus individuais de cada chapa serão preservados.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-700 block">
+                Produto do Catálogo:
+              </label>
+              <select
+                value={batchFixSelectedProduct}
+                onChange={e => setBatchFixSelectedProduct(e.target.value)}
+                className="w-full h-11 px-3 bg-white border-2 border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#1b367c] cursor-pointer"
+              >
+                <option value="023.0116">023.0116 - CHAPA INOX 304 ESC - M2 (1740 x 850 x 0.50 mm)</option>
+                <option value="020.0093">020.0093 - CHAPA BR 0,43 - M2 (3000 x 1200 x 0.43 mm)</option>
+                <option value="023.0105">023.0105 - CHAPA AC FQ (3000 x 1200 x 12.50 mm)</option>
+                <option value="023.0096">023.0096 - CHAPA AC FQ (3000 x 1200 x 2.65 mm)</option>
+                {allAvailableCatalog
+                  .filter(c => !['023.0116', '020.0093', '023.0105', '023.0096'].includes(c.codigo))
+                  .map(p => (
+                    <option key={p.id || p.codigo} value={p.codigo}>
+                      {p.codigo} - {p.descricao} ({p.comprimento_padrao_mm || 0}x{p.largura_padrao_mm || 0}mm)
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsBatchFixModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchFixProvisional(batchFixSelectedProduct)}
+                disabled={isFixingBatch}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 size={16} />
+                <span>{isFixingBatch ? 'Atualizando...' : `Vincular Todas (${provisionalItems.length})`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
