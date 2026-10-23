@@ -445,8 +445,9 @@ export const GeralForm: React.FC<GeralFormProps> = ({
       } else {
         setIdNomus('');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao salvar insumo/chapa:", err);
+      alert("Erro ao cadastrar chapa: " + (err?.message || "Verifique a conexão e tente novamente."));
     } finally {
       setIsSubmitting(false);
     }

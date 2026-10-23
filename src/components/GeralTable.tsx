@@ -389,12 +389,14 @@ export const GeralTable: React.FC<GeralTableProps> = ({
 
   const handleConfirmSingleDelete = async () => {
     if (!itemToDelete) return;
+    const targetId = itemToDelete.id;
     setIsDeleting(true);
     try {
-      await handleDelete(itemToDelete.id);
+      await handleDelete(targetId);
       setItemToDelete(null);
     } catch (err) {
       console.error('Erro ao excluir item:', err);
+      alert('Erro ao excluir item. Tente novamente.');
     } finally {
       setIsDeleting(false);
     }
@@ -1029,7 +1031,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => onOpenSinglePrint(item)}
+                          onClick={() => handleSinglePrintCallback(item)}
                           title="Imprimir Etiqueta"
                           className="h-8.5 w-8.5 flex items-center justify-center bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-[#1b367c] rounded-lg transition-colors border border-blue-200 cursor-pointer shrink-0"
                         >

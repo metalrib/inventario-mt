@@ -38,10 +38,15 @@ import {
   updateGeral,
   updateMultipleGerais,
   deleteGeral,
+  deleteMultipleGerais,
   saveCatalogProduct,
   deleteCatalogProduct,
   getAppConfig,
   saveAppConfig,
+  getLocalPerfis,
+  getLocalBumpers,
+  getLocalGerais,
+  getLocalCatalog,
   saveLocalPerfis,
   saveLocalBumpers,
   saveLocalGerais,
@@ -62,11 +67,11 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [config, setConfig] = useState<AppConfig>(getAppConfig());
 
-  // Data states
-  const [perfis, setPerfis] = useState<PerfilItem[]>([]);
-  const [bumpers, setBumpers] = useState<BumperItem[]>([]);
-  const [gerais, setGerais] = useState<GeralItem[]>([]);
-  const [productCatalog, setProductCatalog] = useState<ProductCatalogItem[]>([]);
+  // Data states - inicializados com dados locais imediatamente para zero atraso
+  const [perfis, setPerfis] = useState<PerfilItem[]>(getLocalPerfis);
+  const [bumpers, setBumpers] = useState<BumperItem[]>(getLocalBumpers);
+  const [gerais, setGerais] = useState<GeralItem[]>(getLocalGerais);
+  const [productCatalog, setProductCatalog] = useState<ProductCatalogItem[]>(getLocalCatalog);
 
   // Modals state
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
@@ -234,13 +239,16 @@ export default function App() {
       status: 'Com ID Nomus',
       operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
+    setPerfis(prev => [saved, ...prev.filter(p => String(p.id) !== String(saved.id))]);
 
     if (config.autoImprimirAoSalvar) {
       handlePrintSinglePerfil(saved);
     }
+    return saved;
   };
 
   const handleEditPerfil = async (id: string | number, updated: Partial<PerfilItem>) => {
+    setPerfis(prev => prev.map(p => String(p.id) === String(id) ? { ...p, ...updated } : p));
     await updatePerfil(id, updated);
   };
 
@@ -270,13 +278,16 @@ export default function App() {
       ...data,
       operador: data.operador || config.operadorPadrao || 'Operador Produção'
     });
+    setBumpers(prev => [saved, ...prev.filter(b => String(b.id) !== String(saved.id))]);
 
     if (config.autoImprimirAoSalvar) {
       handlePrintSingleBumper(saved);
     }
+    return saved;
   };
 
   const handleEditBumper = async (id: string | number, updated: Partial<BumperItem>) => {
+    setBumpers(prev => prev.map(b => String(b.id) === String(id) ? { ...b, ...updated } : b));
     await updateBumper(id, updated);
   };
 
@@ -296,15 +307,19 @@ export default function App() {
   // Handlers for Chapas & Gerais
   const handleSaveGeral = async (itemData: Omit<GeralItem, 'id'>) => {
     const saved = await addGeral(itemData);
+    setGerais(prev => [saved, ...prev.filter(g => String(g.id) !== String(saved.id))]);
     return saved;
   };
 
   const handleSaveMultipleGerais = async (itemsData: Omit<GeralItem, 'id'>[]) => {
     const saved = await addMultipleGerais(itemsData);
+    const savedIds = new Set(saved.map(s => String(s.id)));
+    setGerais(prev => [...saved, ...prev.filter(g => !savedIds.has(String(g.id)))]);
     return saved;
   };
 
   const handleEditGeral = async (id: string | number, updated: Partial<GeralItem>) => {
+    setGerais(prev => prev.map(item => String(item.id) === String(id) ? { ...item, ...updated } : item));
     await updateGeral(id, updated);
   };
 
@@ -318,32 +333,32 @@ export default function App() {
   };
 
   const handleDeleteGeral = async (id: string | number) => {
-    setGerais(prev => prev.filter(g => String(g.id) !== String(id)));
+    const strId = String(id);
+    setGerais(prev => prev.filter(g => String(g.id) !== strId));
     await deleteGeral(id);
   };
 
   const handleClearGerais = async () => {
-    const itemsToDelete = [...gerais];
+    const allIds = gerais.map(g => g.id);
     setGerais([]);
-    for (const g of itemsToDelete) {
-      await deleteGeral(g.id);
-    }
+    await deleteMultipleGerais(allIds);
   };
 
   const handleDeleteBatchGerais = async (ids: (string | number)[]) => {
-    const stringIds = ids.map(String);
-    setGerais(prev => prev.filter(g => !stringIds.includes(String(g.id))));
-    for (const id of ids) {
-      await deleteGeral(id);
-    }
+    const idSet = new Set(ids.map(String));
+    setGerais(prev => prev.filter(g => !idSet.has(String(g.id))));
+    await deleteMultipleGerais(ids);
   };
 
   // Product Catalog Handlers
   const handleSaveCatalogProduct = async (item: Omit<ProductCatalogItem, 'id'> & { id?: string | number }) => {
-    await saveCatalogProduct(item);
+    const saved = await saveCatalogProduct(item);
+    setProductCatalog(prev => [saved, ...prev.filter(p => String(p.id) !== String(saved.id) && p.codigo !== saved.codigo)]);
   };
 
   const handleDeleteCatalogProduct = async (id: string | number) => {
+    const strId = String(id);
+    setProductCatalog(prev => prev.filter(p => String(p.id) !== strId));
     await deleteCatalogProduct(id);
   };
 

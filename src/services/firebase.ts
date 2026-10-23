@@ -41,9 +41,7 @@ function initFirestoreInstance() {
   try {
     return initializeFirestore(app, {
       experimentalAutoDetectLongPolling: true,
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
+      localCache: persistentLocalCache()
     }, databaseId);
   } catch {
     try {
@@ -434,28 +432,36 @@ export async function addGeral(item: Omit<GeralItem, 'id' | 'created_at'> & { cr
     created_at: now
   };
 
+  // 1. Atualiza local IMEDIATAMENTE (resposta instantânea na UI)
+  const current = getLocalGerais();
+  saveLocalGerais([fullItem, ...current.filter(g => String(g.id) !== String(docId))]);
+
+  // 2. Grava no Firestore com campos sanitizados (sem undefined) e timeout de segurança
   try {
     if (fullItem.id_nomus) {
       registerUsedNomusId(fullItem.id_nomus);
     }
-    await setDoc(doc(db, COL_GERAIS, docId), {
-      id_nomus: fullItem.id_nomus,
-      codigo_item: fullItem.codigo_item,
-      descricao_item: fullItem.descricao_item,
+    const firestorePromise = setDoc(doc(db, COL_GERAIS, docId), {
+      id_nomus: fullItem.id_nomus || '',
+      codigo_item: fullItem.codigo_item || '',
+      descricao_item: fullItem.descricao_item || '',
       comprimento_mm: Number(fullItem.comprimento_mm || 0),
       largura_mm: Number(fullItem.largura_mm || 0),
       espessura_mm: Number(fullItem.espessura_mm || 0),
-      quantidade: Number(fullItem.quantidade),
+      quantidade: Number(fullItem.quantidade || 1),
       unidade: fullItem.unidade || 'm²',
       operador: fullItem.operador || 'Operador',
       created_at: now
     });
+
+    await Promise.race([
+      firestorePromise,
+      new Promise(resolve => setTimeout(resolve, 3500))
+    ]);
   } catch (err) {
     console.error('Erro ao adicionar item geral no Firebase:', err);
   }
 
-  const current = getLocalGerais();
-  saveLocalGerais([fullItem, ...current.filter(g => String(g.id) !== String(docId))]);
   return fullItem;
 }
 
@@ -480,63 +486,75 @@ export async function addMultipleGerais(items: (Omit<GeralItem, 'id' | 'created_
     }
   }
 
+  // 1. Atualiza local IMEDIATAMENTE
+  const current = getLocalGerais();
+  const createdIds = new Set(createdItems.map(c => String(c.id)));
+  saveLocalGerais([...createdItems, ...current.filter(g => !createdIds.has(String(g.id)))]);
+
+  // 2. Grava no Firestore em lotes com timeout de segurança
   try {
-    const batch = writeBatch(db);
-    for (const fullItem of createdItems) {
-      const ref = doc(db, COL_GERAIS, String(fullItem.id));
-      batch.set(ref, {
-        id_nomus: fullItem.id_nomus || '',
-        codigo_item: fullItem.codigo_item || '',
-        descricao_item: fullItem.descricao_item || '',
-        comprimento_mm: Number(fullItem.comprimento_mm || 0),
-        largura_mm: Number(fullItem.largura_mm || 0),
-        espessura_mm: Number(fullItem.espessura_mm || 0),
-        quantidade: Number(fullItem.quantidade),
-        unidade: fullItem.unidade || 'm²',
-        operador: fullItem.operador || 'Operador',
-        created_at: fullItem.created_at
-      });
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < createdItems.length; i += BATCH_SIZE) {
+      const chunk = createdItems.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      for (const fullItem of chunk) {
+        const ref = doc(db, COL_GERAIS, String(fullItem.id));
+        batch.set(ref, {
+          id_nomus: fullItem.id_nomus || '',
+          codigo_item: fullItem.codigo_item || '',
+          descricao_item: fullItem.descricao_item || '',
+          comprimento_mm: Number(fullItem.comprimento_mm || 0),
+          largura_mm: Number(fullItem.largura_mm || 0),
+          espessura_mm: Number(fullItem.espessura_mm || 0),
+          quantidade: Number(fullItem.quantidade || 1),
+          unidade: fullItem.unidade || 'm²',
+          operador: fullItem.operador || 'Operador',
+          created_at: fullItem.created_at
+        });
+      }
+      await Promise.race([
+        batch.commit(),
+        new Promise(resolve => setTimeout(resolve, 4000))
+      ]);
     }
-    await batch.commit();
   } catch (err) {
     console.error('Erro ao adicionar lote de itens gerais no Firebase:', err);
   }
 
-  const current = getLocalGerais();
-  saveLocalGerais([...createdItems, ...current]);
   return createdItems;
 }
 
 export async function updateGeral(id: string | number, updates: Partial<GeralItem>): Promise<void> {
   const docId = String(id);
-  try {
-    await setDoc(doc(db, COL_GERAIS, docId), updates, { merge: true });
-  } catch (err) {
-    console.error('Erro ao atualizar item geral no Firebase:', err);
-  }
 
+  // 1. Atualiza local IMEDIATAMENTE
   const current = getLocalGerais();
   const updated = current.map(item => String(item.id) === docId ? { ...item, ...updates } : item);
   saveLocalGerais(updated);
+
+  // 2. Sanitiza objeto para remover campos com valor undefined (que o Firestore proíbe)
+  const cleanUpdates: Record<string, any> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) {
+      cleanUpdates[key] = value;
+    }
+  }
+
+  try {
+    const firestorePromise = setDoc(doc(db, COL_GERAIS, docId), cleanUpdates, { merge: true });
+    await Promise.race([
+      firestorePromise,
+      new Promise(resolve => setTimeout(resolve, 3500))
+    ]);
+  } catch (err) {
+    console.error('Erro ao atualizar item geral no Firebase:', err);
+  }
 }
 
 export async function updateMultipleGerais(updates: { id: string | number; changes: Partial<GeralItem> }[]): Promise<void> {
   if (!updates || updates.length === 0) return;
-  try {
-    const BATCH_SIZE = 450;
-    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
-      const chunk = updates.slice(i, i + BATCH_SIZE);
-      const batch = writeBatch(db);
-      for (const item of chunk) {
-        const docRef = doc(db, COL_GERAIS, String(item.id));
-        batch.set(docRef, item.changes, { merge: true });
-      }
-      await batch.commit();
-    }
-  } catch (err) {
-    console.error('Erro ao atualizar lote de itens gerais no Firebase:', err);
-  }
 
+  // 1. Atualiza local IMEDIATAMENTE
   const current = getLocalGerais();
   const updateMap = new Map(updates.map(u => [String(u.id), u.changes]));
   const updatedList = current.map(item => {
@@ -544,18 +562,76 @@ export async function updateMultipleGerais(updates: { id: string | number; chang
     return changes ? { ...item, ...changes } : item;
   });
   saveLocalGerais(updatedList);
+
+  // 2. Atualiza no Firestore em lote
+  try {
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const chunk = updates.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        const docRef = doc(db, COL_GERAIS, String(item.id));
+        const cleanChanges: Record<string, any> = {};
+        for (const [k, v] of Object.entries(item.changes)) {
+          if (v !== undefined) cleanChanges[k] = v;
+        }
+        batch.set(docRef, cleanChanges, { merge: true });
+      }
+      await Promise.race([
+        batch.commit(),
+        new Promise(resolve => setTimeout(resolve, 4000))
+      ]);
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar lote de itens gerais no Firebase:', err);
+  }
 }
 
 export async function deleteGeral(id: string | number): Promise<void> {
   const docId = String(id);
+
+  // 1. Atualiza local IMEDIATAMENTE (resposta instantânea na interface)
+  const current = getLocalGerais();
+  saveLocalGerais(current.filter(item => String(item.id) !== docId));
+
+  // 2. Exclui do Firestore com timeout de segurança para nunca travar a UI
   try {
-    await deleteDoc(doc(db, COL_GERAIS, docId));
+    const firestorePromise = deleteDoc(doc(db, COL_GERAIS, docId));
+    await Promise.race([
+      firestorePromise,
+      new Promise(resolve => setTimeout(resolve, 3500))
+    ]);
   } catch (err) {
     console.error('Erro ao deletar item geral no Firebase:', err);
   }
+}
 
+export async function deleteMultipleGerais(ids: (string | number)[]): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  const docIds = ids.map(String);
+  const idSet = new Set(docIds);
+
+  // 1. Atualiza local IMEDIATAMENTE
   const current = getLocalGerais();
-  saveLocalGerais(current.filter(item => String(item.id) !== docId));
+  saveLocalGerais(current.filter(item => !idSet.has(String(item.id))));
+
+  // 2. Exclui no Firestore via batch commit (muito mais rápido que 1 a 1)
+  try {
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < docIds.length; i += BATCH_SIZE) {
+      const chunk = docIds.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      for (const docId of chunk) {
+        batch.delete(doc(db, COL_GERAIS, docId));
+      }
+      await Promise.race([
+        batch.commit(),
+        new Promise(resolve => setTimeout(resolve, 4000))
+      ]);
+    }
+  } catch (err) {
+    console.error('Erro ao deletar lote de itens gerais no Firebase:', err);
+  }
 }
 
 // ----------------- CRUD CATÁLOGO DE PRODUTOS -----------------
@@ -629,8 +705,14 @@ export async function saveCatalogProduct(item: Omit<ProductCatalogItem, 'id'> & 
     created_at: now
   };
 
+  // 1. Atualiza local IMEDIATAMENTE
+  const current = getLocalCatalog();
+  const updated = [fullItem, ...current.filter(p => (p.codigo || '').trim().toUpperCase() !== code && String(p.id) !== docId)];
+  saveLocalCatalog(updated);
+
+  // 2. Grava no Firestore com timeout
   try {
-    await setDoc(doc(db, COL_CATALOGO, docId), {
+    const firestorePromise = setDoc(doc(db, COL_CATALOGO, docId), {
       codigo: fullItem.codigo,
       descricao: fullItem.descricao,
       categoria: fullItem.categoria,
@@ -641,26 +723,35 @@ export async function saveCatalogProduct(item: Omit<ProductCatalogItem, 'id'> & 
       medida_padrao_mm: fullItem.medida_padrao_mm || null,
       created_at: now
     }, { merge: true });
+
+    await Promise.race([
+      firestorePromise,
+      new Promise(resolve => setTimeout(resolve, 3500))
+    ]);
   } catch (err) {
     console.error('Erro ao salvar produto no catálogo Firebase:', err);
   }
 
-  const current = getLocalCatalog();
-  const updated = [fullItem, ...current.filter(p => (p.codigo || '').trim().toUpperCase() !== code && String(p.id) !== docId)];
-  saveLocalCatalog(updated);
   return fullItem;
 }
 
 export async function deleteCatalogProduct(id: string | number): Promise<void> {
   const docId = String(id);
+
+  // 1. Atualiza local IMEDIATAMENTE
+  const current = getLocalCatalog();
+  saveLocalCatalog(current.filter(p => String(p.id) !== docId));
+
+  // 2. Exclui do Firestore com timeout
   try {
-    await deleteDoc(doc(db, COL_CATALOGO, docId));
+    const firestorePromise = deleteDoc(doc(db, COL_CATALOGO, docId));
+    await Promise.race([
+      firestorePromise,
+      new Promise(resolve => setTimeout(resolve, 3500))
+    ]);
   } catch (err) {
     console.error('Erro ao deletar produto no catálogo Firebase:', err);
   }
-
-  const current = getLocalCatalog();
-  saveLocalCatalog(current.filter(p => String(p.id) !== docId));
 }
 
 // ----------------- BULK SYNC / SEED -----------------
