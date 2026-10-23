@@ -520,7 +520,29 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                   Modo Focado Ativo: Exibindo <strong>apenas as {filteredItems.length} chapas</strong> do código <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-blue-200 text-slate-900">{selectedProductCode}</strong> {activeProductGroup.descricao ? `— ${activeProductGroup.descricao}` : ''}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold shrink-0">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold shrink-0">
+                {selectedProductCode.toUpperCase().startsWith('ITEM-') && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const first = filteredItems[0];
+                      const targetCode = prompt('Digite o código correto do produto (ex: 023.0116):', '023.0116');
+                      if (!targetCode || !targetCode.trim()) return;
+                      const targetDesc = prompt('Descrição do produto:', 'CHAPA INOX 304 ESC - M2');
+                      for (const it of filteredItems) {
+                        await handleUpdate(it.id, {
+                          codigo_item: targetCode.trim(),
+                          descricao_item: (targetDesc || '').trim() || 'CHAPA INOX 304 ESC - M2'
+                        });
+                      }
+                      handleSetProductCode(targetCode.trim());
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs cursor-pointer"
+                    title="Corrigir código provisório deste grupo"
+                  >
+                    ⚡ Corrigir Código do Produto
+                  </button>
+                )}
                 <span className="bg-emerald-600 text-white px-2.5 py-1 rounded-md shadow-xs">
                   Área do Código: {focusedM2.toFixed(2)} m²
                 </span>

@@ -314,7 +314,10 @@ export const LabelPrintModal: React.FC<LabelPrintModalProps> = ({
     id_nomus: previewId,
     codigo: previewItemCode,
     desc: previewDesc,
-    medida_mm: previewItem.medidaMm || 0,
+    comprimento_mm: previewItem.comprimentoMm || (previewItem as any).comprimento_mm || 0,
+    largura_mm: previewItem.larguraMm || (previewItem as any).largura_mm || 0,
+    espessura_mm: previewItem.espessuraMm || (previewItem as any).espessura_mm || 0,
+    medida_mm: previewItem.medidaMm || previewItem.comprimentoMm || 0,
     medida: previewMedida
   });
 

@@ -83,6 +83,7 @@ export default function App() {
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isBluetoothCollectorOpen, setIsBluetoothCollectorOpen] = useState(false);
+  const [initialCollectorScan, setInitialCollectorScan] = useState<string | null>(null);
   const [scannedCodeForModal, setScannedCodeForModal] = useState<string | null>(null);
   const [isScanResultOpen, setIsScanResultOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function App() {
           buffer = '';
           if (scannedCode) {
             e.preventDefault();
+            setInitialCollectorScan(scannedCode);
             setIsBluetoothCollectorOpen(true);
           }
         } else {
@@ -155,8 +157,31 @@ export default function App() {
       setBumpers(items);
     });
 
+    const healGeraisList = (items: GeralItem[]): GeralItem[] => {
+      return items.map(item => {
+        if ((item.codigo_item || '').toUpperCase().startsWith('ITEM-')) {
+          if (
+            (item.id_nomus || '').includes('2026.08.19.1715') ||
+            (Math.abs((item.comprimento_mm || 0) - 1740) < 2 && Math.abs((item.largura_mm || 0) - 850) < 2)
+          ) {
+            const healed: GeralItem = {
+              ...item,
+              codigo_item: '023.0116',
+              descricao_item: 'CHAPA INOX 304 ESC - M2'
+            };
+            updateGeral(item.id, {
+              codigo_item: '023.0116',
+              descricao_item: 'CHAPA INOX 304 ESC - M2'
+            }).catch(() => {});
+            return healed;
+          }
+        }
+        return item;
+      });
+    };
+
     const unsubGerais = subscribeToGerais((items) => {
-      setGerais(items);
+      setGerais(healGeraisList(items));
     });
 
     const unsubCatalog = subscribeToCatalog((items) => {
@@ -744,7 +769,11 @@ export default function App() {
       {/* High-Speed Bluetooth Barcode Gun / Continuous Collector Modal */}
       <BluetoothCollectorModal
         isOpen={isBluetoothCollectorOpen}
-        onClose={() => setIsBluetoothCollectorOpen(false)}
+        onClose={() => {
+          setIsBluetoothCollectorOpen(false);
+          setInitialCollectorScan(null);
+        }}
+        initialCode={initialCollectorScan}
         perfis={safePerfis}
         bumpers={safeBumpers}
         gerais={safeGerais}

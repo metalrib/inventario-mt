@@ -109,7 +109,27 @@ export const CATALOGO_PERFIS: ProfileCatalogItem[] = [
 ];
 
 export const DEFAULT_PRODUCT_CATALOG: ProductCatalogItem[] = [
-  // Chapas de Aço Carbono FQ e Insumos Metalrib
+  // Chapas de Aço Inox, Aço Carbono FQ e Insumos Metalrib
+  {
+    id: "prod_023_0116",
+    codigo: "023.0116",
+    descricao: "CHAPA INOX 304 ESC - M2",
+    categoria: "Chapas",
+    unidade: "m²",
+    comprimento_padrao_mm: 1740,
+    largura_padrao_mm: 850,
+    espessura_padrao_mm: 0.50
+  },
+  {
+    id: "prod_020_0093",
+    codigo: "020.0093",
+    descricao: "CHAPA BR 0,43 - M2",
+    categoria: "Chapas",
+    unidade: "m²",
+    comprimento_padrao_mm: 3000,
+    largura_padrao_mm: 1200,
+    espessura_padrao_mm: 0.43
+  },
   {
     id: "prod_023_0105",
     codigo: "023.0105",

@@ -19,7 +19,7 @@ import {
   ListPlus
 } from 'lucide-react';
 import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem, AppMode } from '../types';
-import { CATALOGO_PERFIS } from '../data/catalog';
+import { CATALOGO_PERFIS, DEFAULT_PRODUCT_CATALOG } from '../data/catalog';
 import { generateNomusIdSequence } from '../services/firebase';
 
 interface ScanResultModalProps {
@@ -79,17 +79,31 @@ export function parseDimensionString(rawMedida: string) {
   return { comprimento: 0, largura: 0, espessura: 0, raw: rawMedida };
 }
 
-export function parseScannedPayload(raw: string) {
-  const text = (raw || '').trim();
+export function parseScannedPayload(
+  raw: string, 
+  catalog: ProductCatalogItem[] = [], 
+  existingGerais: GeralItem[] = [],
+  existingPerfis: PerfilItem[] = []
+) {
+  let text = (raw || '').trim();
+  // Strip AIM symbology identifiers (e.g., ]Q1, ]Q3, ]C1, ]e0) sent by 2D barcode readers
+  text = text.replace(/^\][A-Za-z0-9]{2}/, '').trim();
+
   let parsedJson: any = null;
 
-  // 1. Try parsing JSON format
-  if (text.startsWith('{')) {
+  // 1. Try parsing JSON format (extract candidate between outermost { and })
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+  if (jsonStart !== -1 && jsonEnd > jsonStart) {
+    const candidate = text.substring(jsonStart, jsonEnd + 1);
     try {
-      parsedJson = JSON.parse(text);
+      parsedJson = JSON.parse(candidate);
     } catch {
       try {
-        const sanitized = text.replace(/[\r\n]+/g, ' ').replace(/,\s*}/g, '}');
+        const sanitized = candidate
+          .replace(/[\r\n]+/g, ' ')
+          .replace(/'/g, '"')
+          .replace(/,\s*}/g, '}');
         parsedJson = JSON.parse(sanitized);
       } catch {
         // Fallback to text parsing
@@ -108,11 +122,10 @@ export function parseScannedPayload(raw: string) {
   let parsedCategoriaHint = '';
 
   if (parsedJson) {
-    parsedIdNomus = parsedJson.id_nomus || parsedJson.idNomus || parsedJson.id || '';
-    parsedCodigo = parsedJson.codigo || parsedJson.codigoItem || parsedJson.code || '';
-    parsedDesc = parsedJson.desc || parsedJson.descricao || parsedJson.descricaoItem || '';
+    parsedIdNomus = String(parsedJson.id_nomus || parsedJson.idNomus || parsedJson.id || '').trim();
+    parsedCodigo = String(parsedJson.codigo || parsedJson.codigoItem || parsedJson.code || parsedJson.c || '').trim();
+    parsedDesc = String(parsedJson.desc || parsedJson.descricao || parsedJson.descricaoItem || parsedJson.d || '').trim();
 
-    // Check explicit dimension fields first
     if (parsedJson.comprimento_mm !== undefined && parsedJson.comprimento_mm !== null) {
       parsedComprimentoMm = parseFloat(String(parsedJson.comprimento_mm)) || 0;
     }
@@ -123,7 +136,6 @@ export function parseScannedPayload(raw: string) {
       parsedEspessuraMm = parseFloat(String(parsedJson.espessura_mm)) || 0;
     }
 
-    // Parse 'medida' string (e.g. "1740 x 850 x 0.5 MM" or "6000 MM")
     const rawMedidaStr = String(parsedJson.medida || parsedJson.medidaFormatted || '').trim();
     if (rawMedidaStr) {
       const dims = parseDimensionString(rawMedidaStr);
@@ -132,7 +144,6 @@ export function parseScannedPayload(raw: string) {
       if (!parsedEspessuraMm && dims.espessura > 0) parsedEspessuraMm = dims.espessura;
     }
 
-    // Fallback to 'medida_mm' if single length
     if (!parsedComprimentoMm && parsedJson.medida_mm) {
       parsedComprimentoMm = parseFloat(String(parsedJson.medida_mm)) || 0;
     }
@@ -144,85 +155,180 @@ export function parseScannedPayload(raw: string) {
     if (parsedJson.unidade) {
       parsedUnidade = String(parsedJson.unidade);
     }
-  } else {
-    // 2. Parse Multiline Key-Value or Nomus Label Text
-    const lines = text.split(/[\r\n]+/);
-    for (const line of lines) {
-      const lower = line.toLowerCase();
-      if (lower.includes('id nomus') || lower.includes('id:') || lower.startsWith('id ')) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) parsedIdNomus = parts[1].trim();
-      } else if (lower.includes('cód') || lower.includes('cod:') || lower.includes('codigo:')) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) parsedCodigo = parts[1].trim();
-      } else if (lower.includes('desc') || lower.includes('descrição:') || lower.includes('descricao:')) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) parsedDesc = parts[1].trim();
-      } else if (lower.includes('medida:') || lower.includes('medida') || lower.includes('dimens')) {
-        const parts = line.split(/[:=]/);
-        const val = parts[1] ? parts[1].trim() : line;
-        const dims = parseDimensionString(val);
-        if (dims.comprimento > 0) parsedComprimentoMm = dims.comprimento;
-        if (dims.largura > 0) parsedLarguraMm = dims.largura;
-        if (dims.espessura > 0) parsedEspessuraMm = dims.espessura;
-      } else if (lower.includes('qtd') || lower.includes('quantidade:')) {
-        const parts = line.split(/[:=]/);
-        if (parts[1]) {
-          const match = parts[1].match(/\d+/);
-          if (match) parsedQtd = parseInt(match[0], 10);
-        }
-      }
-    }
+  }
 
-    // 3. Regex extractions if key-value wasn't cleanly split
-    if (!parsedIdNomus) {
-      const nomusMatch = text.match(/\b\d{4}\.\d{2}\.\d{2}\.\d{4,}\b/);
-      if (nomusMatch) {
-        parsedIdNomus = nomusMatch[0];
-      }
+  // 2. Multiline / Line-by-line parsing if any fields still missing
+  const lines = text.split(/[\r\n]+/);
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (!parsedIdNomus && (lower.includes('id nomus') || lower.includes('id:') || lower.startsWith('id '))) {
+      const parts = line.split(/[:=]/);
+      if (parts[1]) parsedIdNomus = parts[1].trim();
     }
-
-    if (!parsedCodigo) {
-      const codMatch = text.match(/C[oó]d\.?:\s*([A-Za-z0-9._-]+)/i);
-      if (codMatch) {
-        parsedCodigo = codMatch[1].trim();
-      }
+    if (!parsedCodigo && (lower.includes('cód') || lower.includes('cod:') || lower.includes('codigo:'))) {
+      const parts = line.split(/[:=]/);
+      if (parts[1]) parsedCodigo = parts[1].trim();
     }
-
-    if (!parsedComprimentoMm) {
-      const dimMatch = text.match(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?))?/);
-      if (dimMatch) {
-        parsedComprimentoMm = parseFloat(dimMatch[1].replace(',', '.')) || 0;
-        parsedLarguraMm = parseFloat(dimMatch[2].replace(',', '.')) || 0;
-        if (dimMatch[3]) {
-          parsedEspessuraMm = parseFloat(dimMatch[3].replace(',', '.')) || 0;
-        }
-      } else {
-        const singleMm = text.match(/(\d+(?:[.,]\d+)?)\s*(?:mm|mil[ií]metros)/i);
-        if (singleMm) {
-          parsedComprimentoMm = parseFloat(singleMm[1].replace(',', '.')) || 0;
-        }
-      }
+    if (!parsedDesc && (lower.includes('desc') || lower.includes('descrição:') || lower.includes('descricao:'))) {
+      const parts = line.split(/[:=]/);
+      if (parts[1]) parsedDesc = parts[1].trim();
     }
+    if ((!parsedComprimentoMm || !parsedLarguraMm) && (lower.includes('medida:') || lower.includes('medida') || lower.includes('dimens'))) {
+      const parts = line.split(/[:=]/);
+      const val = parts[1] ? parts[1].trim() : line;
+      const dims = parseDimensionString(val);
+      if (!parsedComprimentoMm && dims.comprimento > 0) parsedComprimentoMm = dims.comprimento;
+      if (!parsedLarguraMm && dims.largura > 0) parsedLarguraMm = dims.largura;
+      if (!parsedEspessuraMm && dims.espessura > 0) parsedEspessuraMm = dims.espessura;
+    }
+  }
 
-    // 4. Single code or plain string fallback
-    if (!parsedIdNomus && !parsedCodigo) {
-      if (/^\d{4}\.\d{2}\.\d{2}\.\d{4,}$/.test(text)) {
-        parsedIdNomus = text;
-      } else if (text.length <= 40 && !text.includes('\n')) {
-        parsedCodigo = text;
+  // 3. Regex extractions from whole text
+  // Extract Nomus ID (e.g., 2026.08.19.1715)
+  if (!parsedIdNomus) {
+    const nomusMatch = text.match(/\b\d{4}\.\d{2}\.\d{2}\.\d{4,}\b/);
+    if (nomusMatch) {
+      parsedIdNomus = nomusMatch[0];
+    }
+  }
+
+  // Extract Metalrib standard Product Code: 3 digits . 4 digits (e.g. 023.0116, 020.0093, 022.0017, 022.0129-C)
+  if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+    const metalribCodeMatch = text.match(/\b(0\d{2}\.\d{4}(?:-[A-Za-z0-9]+)?)\b/);
+    if (metalribCodeMatch) {
+      parsedCodigo = metalribCodeMatch[1];
+    }
+  }
+
+  // Extract Key-Value Code: "Cód: 023.0116", "Cod: ...", "codigo: ..."
+  if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+    const codMatch = text.match(/(?:c[oó]d(?:igo)?|code|c[oó]d\.?)\s*[:=-]?\s*([A-Za-z0-9._-]+)/i);
+    if (codMatch && !codMatch[1].toUpperCase().startsWith('ITEM-')) {
+      parsedCodigo = codMatch[1].trim();
+    }
+  }
+
+  // Extract Description from text
+  if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+    const descMatch = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n,\"]+)/i);
+    if (descMatch) {
+      parsedDesc = descMatch[1].trim();
+    }
+  }
+
+  // Extract Dimensions: e.g. 1740 x 850 x 0.5 MM
+  if (!parsedComprimentoMm || !parsedLarguraMm) {
+    const dimMatch = text.match(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?))?/);
+    if (dimMatch) {
+      if (!parsedComprimentoMm) parsedComprimentoMm = parseFloat(dimMatch[1].replace(',', '.')) || 0;
+      if (!parsedLarguraMm) parsedLarguraMm = parseFloat(dimMatch[2].replace(',', '.')) || 0;
+      if (!parsedEspessuraMm && dimMatch[3]) {
+        parsedEspessuraMm = parseFloat(dimMatch[3].replace(',', '.')) || 0;
+      }
+    } else if (!parsedComprimentoMm) {
+      const singleMm = text.match(/(\d+(?:[.,]\d+)?)\s*(?:mm|mil[ií]metros)/i);
+      if (singleMm) {
+        parsedComprimentoMm = parseFloat(singleMm[1].replace(',', '.')) || 0;
       }
     }
   }
 
-  // 5. Categoria Hint detection
+  // 4. Single code or plain string fallback if nothing parsed
+  if (!parsedIdNomus && !parsedCodigo) {
+    if (/^\d{4}\.\d{2}\.\d{2}\.\d{4,}$/.test(text)) {
+      parsedIdNomus = text;
+    } else if (text.length <= 40 && !text.includes('\n') && !text.includes('{')) {
+      parsedCodigo = text;
+    }
+  }
+
+  // 5. CATALOG ENRICHMENT: Look up catalog for code or ID
+  const allCatalog = [...(catalog || []), ...DEFAULT_PRODUCT_CATALOG];
+  const cleanCode = (parsedCodigo || '').trim().toLowerCase();
+  const cleanId = (parsedIdNomus || '').trim().toLowerCase();
+
+  const matchedCat = allCatalog.find(c => 
+    (cleanCode && c.codigo.toLowerCase() === cleanCode) ||
+    (cleanId && c.codigo.toLowerCase() === cleanId)
+  );
+
+  const matchedPerfilCat = CATALOGO_PERFIS.find(p => 
+    (cleanCode && p.code.toLowerCase() === cleanCode)
+  );
+
+  if (matchedCat) {
+    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+      parsedCodigo = matchedCat.codigo;
+    }
+    if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+      parsedDesc = matchedCat.descricao;
+    }
+    if (!parsedComprimentoMm && matchedCat.comprimento_padrao_mm) {
+      parsedComprimentoMm = matchedCat.comprimento_padrao_mm;
+    }
+    if (!parsedLarguraMm && matchedCat.largura_padrao_mm) {
+      parsedLarguraMm = matchedCat.largura_padrao_mm;
+    }
+    if (!parsedEspessuraMm && matchedCat.espessura_padrao_mm) {
+      parsedEspessuraMm = matchedCat.espessura_padrao_mm;
+    }
+    if (!parsedUnidade && matchedCat.unidade) {
+      parsedUnidade = matchedCat.unidade;
+    }
+  } else if (matchedPerfilCat) {
+    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+      parsedCodigo = matchedPerfilCat.code;
+    }
+    if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+      parsedDesc = matchedPerfilCat.desc;
+    }
+  }
+
+  // 6. EXISTING INVENTORY ENRICHMENT:
+  // If we have an existing plate with this Nomus ID, retrieve its full details
+  if (cleanId && existingGerais && existingGerais.length > 0) {
+    const existingWithId = existingGerais.find(g => (g.id_nomus || '').trim().toLowerCase() === cleanId);
+    if (existingWithId) {
+      if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+        parsedCodigo = existingWithId.codigo_item;
+      }
+      if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+        parsedDesc = existingWithId.descricao_item;
+      }
+      if (!parsedComprimentoMm && existingWithId.comprimento_mm) {
+        parsedComprimentoMm = existingWithId.comprimento_mm;
+      }
+      if (!parsedLarguraMm && existingWithId.largura_mm) {
+        parsedLarguraMm = existingWithId.largura_mm;
+      }
+      if (!parsedEspessuraMm && existingWithId.espessura_mm) {
+        parsedEspessuraMm = existingWithId.espessura_mm;
+      }
+      if (!parsedUnidade && existingWithId.unidade) {
+        parsedUnidade = existingWithId.unidade;
+      }
+    }
+  }
+
+  // If code is known and matches existing plate in inventory, copy description if missing
+  if (cleanCode && existingGerais && existingGerais.length > 0) {
+    const existingWithCode = existingGerais.find(g => (g.codigo_item || '').trim().toLowerCase() === cleanCode);
+    if (existingWithCode) {
+      if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+        parsedDesc = existingWithCode.descricao_item;
+      }
+    }
+  }
+
+  // 7. Categoria Hint detection
   const combinedText = `${parsedCodigo} ${parsedDesc} ${text}`.toUpperCase();
-  if (combinedText.includes('BUMPER') || parsedCodigo.toUpperCase().startsWith('OP')) {
+  if (combinedText.includes('BUMPER') || (parsedCodigo && parsedCodigo.toUpperCase().startsWith('OP'))) {
     parsedCategoriaHint = 'bumper';
   } else if (
     combinedText.includes('CHAPA') || 
     combinedText.includes('PLACA') || 
     combinedText.includes('FQ') || 
+    combinedText.includes('INOX') || 
     combinedText.includes('M2') || 
     parsedLarguraMm > 0
   ) {
@@ -296,7 +402,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   const safeGerais = gerais || [];
   const safeCatalog = productCatalog || [];
 
-  const parsed = parseScannedPayload(scannedCode || '');
+  const parsed = parseScannedPayload(scannedCode || '', safeCatalog, safeGerais, safePerfis);
   const {
     idNomus,
     codigoItem,

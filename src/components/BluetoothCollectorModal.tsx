@@ -21,6 +21,7 @@ import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem, AppMode } from '
 import { parseScannedPayload } from './ScanResultModal';
 import { playBeepSuccess, playBeepDouble, playBeepChime, playBeepError } from '../utils/scannerAudio';
 import { generateNomusIdSequence } from '../services/firebase';
+import { DEFAULT_PRODUCT_CATALOG } from '../data/catalog';
 
 export interface ScanSessionItem {
   id: string;
@@ -40,6 +41,7 @@ export interface ScanSessionItem {
 interface BluetoothCollectorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialCode?: string | null;
   perfis: PerfilItem[];
   bumpers: BumperItem[];
   gerais: GeralItem[];
@@ -59,6 +61,7 @@ interface BluetoothCollectorModalProps {
 export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = ({
   isOpen,
   onClose,
+  initialCode,
   perfis,
   bumpers,
   gerais,
@@ -125,6 +128,12 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
     localStorage.setItem('metalrib_collector_auto_mode', String(val));
   };
 
+  useEffect(() => {
+    if (isOpen && initialCode) {
+      processScan(initialCode);
+    }
+  }, [isOpen, initialCode]);
+
   // Main Barcode / QR Code Processor
   const processScan = async (rawCode: string) => {
     const trimmed = (rawCode || '').trim();
@@ -134,14 +143,18 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
     setLastRawScanned(trimmed);
 
     try {
-      const parsed = parseScannedPayload(trimmed);
+      const parsed = parseScannedPayload(trimmed, productCatalog, gerais, perfis);
       const cleanId = (parsed.idNomus || '').trim().toLowerCase();
       const cleanCode = (parsed.codigoItem || '').trim().toLowerCase();
       const qtyToAdd = parsed.quantidade > 0 ? parsed.quantidade : 1;
 
       // 1. Check if matches existing GERAL / CHAPA
       const existingGeral = gerais.find(g => {
-        if (cleanId && (g.id_nomus || '').trim().toLowerCase() === cleanId) return true;
+        // If scan contains a specific Nomus ID, match ONLY against that same ID
+        if (cleanId) {
+          return (g.id_nomus || '').trim().toLowerCase() === cleanId;
+        }
+        // If no Nomus ID is present, match by exact product code and dimensions
         if (cleanCode && (g.codigo_item || '').trim().toLowerCase() === cleanCode) {
           if (parsed.comprimentoMm && parsed.larguraMm) {
             return (
@@ -156,7 +169,9 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
       // 2. Check if matches existing PERFIL
       const existingPerfil = perfis.find(p => {
-        if (cleanId && (p.id_nomus || '').trim().toLowerCase() === cleanId) return true;
+        if (cleanId) {
+          return (p.id_nomus || '').trim().toLowerCase() === cleanId;
+        }
         if (cleanCode && (p.codigo_perfil || '').trim().toLowerCase() === cleanCode) {
           if (parsed.comprimentoMm) {
             return Math.abs((p.medida_mm || 0) - parsed.comprimentoMm) < 2;
@@ -168,10 +183,44 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
       // 3. Check if matches existing BUMPER
       const existingBumper = bumpers.find(b => {
-        if (cleanId && (b.id_nomus || '').trim().toLowerCase() === cleanId) return true;
+        if (cleanId) {
+          return (b.id_nomus || '').trim().toLowerCase() === cleanId;
+        }
         if (cleanCode && (b.codigo || '').trim().toLowerCase() === cleanCode) return true;
         return false;
       });
+
+      // CASE A-HEAL: If existing item was saved as ITEM-xxxx (e.g. from earlier scan issue) and we now have the true product code
+      if (existingGeral && (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-') && parsed.codigoItem) {
+        const updatePayload: Partial<GeralItem> = {
+          codigo_item: parsed.codigoItem,
+          descricao_item: parsed.descItem || existingGeral.descricao_item,
+        };
+        if (parsed.comprimentoMm) updatePayload.comprimento_mm = parsed.comprimentoMm;
+        if (parsed.larguraMm) updatePayload.largura_mm = parsed.larguraMm;
+        if (parsed.espessuraMm) updatePayload.espessura_mm = parsed.espessuraMm;
+
+        await onUpdateGeral(existingGeral.id, updatePayload);
+        if (soundEnabled) playBeepDouble();
+
+        const historyItem: ScanSessionItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date().toLocaleTimeString('pt-BR'),
+          rawCode: trimmed,
+          action: 'incremented',
+          itemType: 'geral',
+          itemId: existingGeral.id,
+          codigo: parsed.codigoItem,
+          descricao: parsed.descItem || existingGeral.descricao_item,
+          idNomus: existingGeral.id_nomus,
+          medidaFormatted: `${parsed.comprimentoMm || existingGeral.comprimento_mm}x${parsed.larguraMm || existingGeral.largura_mm}mm`,
+          quantityAdded: 0,
+          newTotalQuantity: Number(existingGeral.quantidade) || 1,
+        };
+        setSessionHistory(prev => [historyItem, ...prev]);
+        triggerFeedback('success', `Item Corrigido para ${parsed.codigoItem}!`, `${parsed.descItem || 'Chapa'} atualizada com sucesso`);
+        return;
+      }
 
       // CASE A: Existing item found -> AUTO INCREMENT
       if (existingGeral) {
@@ -257,7 +306,8 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
       // CASE B: Item is NEW in Inventory
       // Check if code matches Product Catalog or is full QR Code with specs
-      const matchedCatalog = productCatalog.find(c => 
+      const allCatalog = [...(productCatalog || []), ...DEFAULT_PRODUCT_CATALOG];
+      const matchedCatalog = allCatalog.find(c => 
         (cleanCode && (c.codigo || '').trim().toLowerCase() === cleanCode) ||
         (cleanId && (c.codigo || '').trim().toLowerCase() === cleanId)
       );
@@ -274,15 +324,15 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         targetCat = 'perfil';
       }
 
-      if (autoProcessMode && (parsed.codigoItem || matchedCatalog || parsed.idNomus)) {
-        // Auto-register new item
-        const finalCodigo = parsed.codigoItem || matchedCatalog?.codigo || 'ITEM-' + Date.now().toString().slice(-4);
-        const finalDesc = parsed.descItem || matchedCatalog?.descricao || (targetCat === 'bumper' ? 'BUMPER' : 'Item do Inventário');
-        const finalComprimento = parsed.comprimentoMm || matchedCatalog?.comprimento_padrao_mm || matchedCatalog?.medida_padrao_mm || 0;
-        const finalLargura = parsed.larguraMm || matchedCatalog?.largura_padrao_mm || 0;
-        const finalEspessura = parsed.espessuraMm || matchedCatalog?.espessura_padrao_mm || 0;
-        const finalNomus = parsed.idNomus || generateNomusIdSequence(1)[0];
+      const finalCodigo = parsed.codigoItem || matchedCatalog?.codigo || '';
+      const finalDesc = parsed.descItem || matchedCatalog?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : ''));
+      const finalComprimento = parsed.comprimentoMm || matchedCatalog?.comprimento_padrao_mm || matchedCatalog?.medida_padrao_mm || 0;
+      const finalLargura = parsed.larguraMm || matchedCatalog?.largura_padrao_mm || 0;
+      const finalEspessura = parsed.espessuraMm || matchedCatalog?.espessura_padrao_mm || 0;
+      const finalNomus = parsed.idNomus || generateNomusIdSequence(1)[0];
 
+      if (autoProcessMode && finalCodigo) {
+        // Auto-register new item with true product code
         if (targetCat === 'geral') {
           await onAddGeral({
             id_nomus: finalNomus,
@@ -339,12 +389,12 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         return;
       }
 
-      // CASE C: Code is unrecognized or autoProcessMode is off -> Open manual modal
+      // CASE C: Code is unrecognized or autoProcessMode is off -> Open manual modal with pre-parsed info
       if (soundEnabled) playBeepSuccess();
       if (onOpenManualModal) {
         onOpenManualModal(trimmed);
       } else {
-        triggerFeedback('info', 'Código Lido', trimmed);
+        triggerFeedback('info', 'Código Lido - Aguardando Confirmação', trimmed);
       }
 
     } catch (err) {
