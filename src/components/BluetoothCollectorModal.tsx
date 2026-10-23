@@ -260,30 +260,41 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         return;
       }
 
-      // CASE A: Existing item found -> AUTO INCREMENT & HEAL CORRUPTED DIMENSIONS
+      // CASE A: Existing item found -> AUTO INCREMENT & SYNC/HEAL REAL DIMENSIONS
       if (existingGeral) {
         const currentQty = Number(existingGeral.quantidade) || 0;
         const newQty = currentQty + qtyToAdd;
 
-        // Check if existing item has corrupted dimensions (e.g. 1mm length, 304mm width, 405mm thickness)
+        // Determine if existing item had corrupted dimensions (e.g. 1mm length, 304mm width, or >50mm thickness)
         const hasCorruptedDims = (existingGeral.comprimento_mm || 0) <= 10 || (existingGeral.espessura_mm || 0) > 50;
-        
-        let finalComp = existingGeral.comprimento_mm;
-        let finalLarg = existingGeral.largura_mm;
-        let finalEsp = existingGeral.espessura_mm;
-        let finalCod = existingGeral.codigo_item;
-        let finalDesc = existingGeral.descricao_item;
+        const healProd = effectiveBatchProd || activeBatchProduct;
 
-        if (hasCorruptedDims || (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-')) {
-          const healProd = effectiveBatchProd || activeBatchProduct;
-          if (healProd) {
-            finalCod = healProd.codigo;
-            finalDesc = healProd.descricao;
-            finalComp = healProd.comprimento_padrao_mm || 1740;
-            finalLarg = healProd.largura_padrao_mm || 850;
-            finalEsp = healProd.espessura_padrao_mm || 0.5;
-          }
-        }
+        // 1. Prioritize explicit valid dimensions parsed from the physical label (e.g. 2040 x 220 x 0.5 MM)
+        // 2. Otherwise keep existing item dimensions if valid (> 10mm)
+        // 3. Otherwise fall back to batch product or catalog defaults
+        let finalComp = (parsed.comprimentoMm && parsed.comprimentoMm > 10)
+          ? parsed.comprimentoMm
+          : (!hasCorruptedDims ? (existingGeral.comprimento_mm || 0) : (healProd?.comprimento_padrao_mm || 1740));
+
+        let finalLarg = (parsed.larguraMm && parsed.larguraMm > 10 && !(parsed.larguraMm === 304 && parsed.comprimentoMm <= 10))
+          ? parsed.larguraMm
+          : (!hasCorruptedDims ? (existingGeral.largura_mm || 0) : (healProd?.largura_padrao_mm || 850));
+
+        let finalEsp = (parsed.espessuraMm && parsed.espessuraMm > 0 && parsed.espessuraMm <= 50)
+          ? parsed.espessuraMm
+          : (!hasCorruptedDims ? (existingGeral.espessura_mm || 0) : (healProd?.espessura_padrao_mm || 0.5));
+
+        let finalCod = (parsed.codigoItem && !parsed.codigoItem.toUpperCase().startsWith('ITEM-'))
+          ? parsed.codigoItem
+          : ((existingGeral.codigo_item && !existingGeral.codigo_item.toUpperCase().startsWith('ITEM-'))
+              ? existingGeral.codigo_item
+              : (healProd?.codigo || '023.0116'));
+
+        let finalDesc = (parsed.descItem && !parsed.descItem.toLowerCase().startsWith('item'))
+          ? parsed.descItem
+          : ((existingGeral.descricao_item && !existingGeral.descricao_item.toLowerCase().startsWith('item'))
+              ? existingGeral.descricao_item
+              : (healProd?.descricao || 'CHAPA INOX 304 ESC - M2'));
 
         const updatePayload: Partial<GeralItem> = {
           quantidade: newQty,

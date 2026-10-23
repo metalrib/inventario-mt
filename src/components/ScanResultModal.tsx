@@ -163,11 +163,18 @@ export function parseScannedPayload(
     const lower = line.toLowerCase();
     if (!parsedIdNomus && (lower.includes('id nomus') || lower.includes('id:') || lower.startsWith('id '))) {
       const parts = line.split(/[:=]/);
-      if (parts[1]) parsedIdNomus = parts[1].trim();
+      if (parts[1]) {
+        const val = parts[1].trim().split(/\s+/)[0];
+        if (/^\d{4}\.\d{2}\.\d{2}\.\d{4,}$/.test(val)) parsedIdNomus = val;
+        else if (parts[1].trim().length <= 30) parsedIdNomus = parts[1].trim();
+      }
     }
     if (!parsedCodigo && (lower.includes('cód') || lower.includes('cod:') || lower.includes('codigo:'))) {
       const parts = line.split(/[:=]/);
-      if (parts[1]) parsedCodigo = parts[1].trim();
+      if (parts[1]) {
+        const val = parts[1].trim().split(/\s+/)[0];
+        if (val) parsedCodigo = val;
+      }
     }
     if (!parsedDesc && (lower.includes('desc') || lower.includes('descrição:') || lower.includes('descricao:'))) {
       const parts = line.split(/[:=]/);
@@ -184,11 +191,14 @@ export function parseScannedPayload(
   }
 
   // 3. Regex extractions from whole text
-  // Extract Nomus ID (e.g., 2026.08.19.1715)
+  // Extract Nomus ID (e.g., 2026.08.19.1715 or 2026.08.19.1549)
   if (!parsedIdNomus) {
-    const nomusMatch = text.match(/\b\d{4}\.\d{2}\.\d{2}\.\d{4,}\b/);
+    const nomusMatch = text.match(/\b(\d{4}\.\d{2}\.\d{2}\.\d{4,})\b/);
     if (nomusMatch) {
-      parsedIdNomus = nomusMatch[0];
+      parsedIdNomus = nomusMatch[1];
+    } else {
+      const idKeyMatch = text.match(/(?:id(?:\s*nomus)?)\s*[:=-]?\s*([0-9.]+)/i);
+      if (idKeyMatch) parsedIdNomus = idKeyMatch[1].trim();
     }
   }
 
@@ -202,21 +212,35 @@ export function parseScannedPayload(
 
   // Extract Key-Value Code: "Cód: 023.0116", "Cod: ...", "codigo: ..."
   if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
-    const codMatch = text.match(/(?:c[oó]d(?:igo)?|code|c[oó]d\.?)\s*[:=-]?\s*([A-Za-z0-9._-]+)/i);
+    const codMatch = text.match(/(?:c[oó]d(?:igo)?|code|c[oó]d\.?)\s*[:=-]?\s*([0-9]{3}\.[0-9]{4}(?:-[A-Za-z0-9]+)?|[A-Za-z0-9._-]+)/i);
     if (codMatch && !codMatch[1].toUpperCase().startsWith('ITEM-')) {
       parsedCodigo = codMatch[1].trim();
     }
   }
 
-  // Extract Description from text
+  // Extract Description from text using lookahead before next section
   if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
-    const descMatch = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n,\"]+)/i);
+    const descMatch = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n:;]+?)(?=\s*(?:medida|dimens|id|c[oó]d|peso|qtd|quantidade|$))/i);
     if (descMatch) {
       parsedDesc = descMatch[1].trim();
+    } else {
+      const fallbackDesc = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n,\"]+)/i);
+      if (fallbackDesc) parsedDesc = fallbackDesc[1].trim();
     }
   }
 
-  // Extract Dimensions: e.g. 1740 x 850 x 0.5 MM
+  // Priority 1 for Dimensions: Explicit "MEDIDA:" or "DIMENSÕES:" field from label
+  if (!parsedComprimentoMm || !parsedLarguraMm) {
+    const explicitMedidaMatch = text.match(/(?:medida|dimens[oõ]es)\s*[:=-]?\s*([^\r\n:;]+?)(?=\s*(?:id|c[oó]d|peso|qtd|quantidade|desc|$))/i);
+    if (explicitMedidaMatch) {
+      const dims = parseDimensionString(explicitMedidaMatch[1]);
+      if (dims.comprimento > 10) parsedComprimentoMm = dims.comprimento;
+      if (dims.largura > 10) parsedLarguraMm = dims.largura;
+      if (dims.espessura > 0 && dims.espessura <= 50) parsedEspessuraMm = dims.espessura;
+    }
+  }
+
+  // Priority 2 for Dimensions: Scan entire text for 3-part or 2-part dimension patterns
   if (!parsedComprimentoMm || !parsedLarguraMm) {
     const allMatches = [...text.matchAll(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?))?/g)];
     
@@ -233,7 +257,7 @@ export function parseScannedPayload(
       if (n1 <= 10) continue;
       if ((n2 === 304 || n2 === 430 || n2 === 316) && n1 <= 50) continue;
 
-      // Standard 3-part: Length >= 50, Width >= 50, Thickness <= 50 (e.g. 1740 x 850 x 0.5)
+      // Standard 3-part: Length >= 50, Width >= 50, Thickness <= 50 (e.g. 2040 x 220 x 0.5)
       if (n1 >= 50 && n2 >= 50 && n3 <= 50) {
         validComp = n1;
         validLarg = n2;
@@ -241,7 +265,7 @@ export function parseScannedPayload(
         break;
       }
 
-      // Format Thickness x Length x Width: e.g. 0.50 x 1740 x 850
+      // Format Thickness x Length x Width: e.g. 0.50 x 2040 x 220
       if (n1 <= 50 && n2 >= 50 && n3 >= 50) {
         validEsp = n1;
         validComp = n2;
@@ -249,7 +273,7 @@ export function parseScannedPayload(
         break;
       }
 
-      // 2-part format: Length x Width (e.g. 1740 x 850)
+      // 2-part format: Length x Width (e.g. 2040 x 220)
       if (n1 >= 50 && n2 >= 50 && n3 === 0) {
         validComp = n1;
         validLarg = n2;
