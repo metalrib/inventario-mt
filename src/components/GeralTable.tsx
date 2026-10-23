@@ -172,17 +172,21 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         qty = Number(item.quantidade) || 0;
       }
 
+      const isBogusDesc = (d?: string) => !d || d.includes('id_nomus') || d.startsWith('1,') || d.toLowerCase().startsWith('item');
+      const catProd = DEFAULT_PRODUCT_CATALOG.find(c => c.codigo.toLowerCase() === code.toLowerCase());
+      const cleanDesc = (!isBogusDesc(item.descricao_item)) ? item.descricao_item : (catProd?.descricao || item.descricao_item || '');
+
       if (existing) {
         existing.count += 1;
         existing.totalQty += qty;
         existing.totalM2 += m2;
-        if (!existing.descricao && item.descricao_item) {
-          existing.descricao = item.descricao_item;
+        if ((!existing.descricao || isBogusDesc(existing.descricao)) && cleanDesc) {
+          existing.descricao = cleanDesc;
         }
       } else {
         map.set(code, {
           codigo: code,
-          descricao: item.descricao_item || '',
+          descricao: cleanDesc,
           count: 1,
           totalQty: qty,
           totalM2: m2
@@ -677,6 +681,26 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                     ⚡ Corrigir Código do Produto
                   </button>
                 )}
+                {/* Auto-heal corrupted descriptions like 1,"id_nomus" in bulk */}
+                {filteredItems.some(it => !it.descricao_item || it.descricao_item.includes('id_nomus') || it.descricao_item.startsWith('1,')) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const cat = DEFAULT_PRODUCT_CATALOG.find(c => c.codigo.toLowerCase() === (selectedProductCode || '').toLowerCase());
+                      const targetDesc = cat?.descricao || 'CHAPA INOX 304 ESC - M2';
+                      const itemsToFix = filteredItems.filter(it => !it.descricao_item || it.descricao_item.includes('id_nomus') || it.descricao_item.startsWith('1,'));
+                      for (const it of itemsToFix) {
+                        await handleUpdate(it.id, {
+                          descricao_item: targetDesc
+                        });
+                      }
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                    title="Salvar descrição correta para todas as chapas deste lote"
+                  >
+                    ✨ Corrigir Descrições ({filteredItems.filter(it => !it.descricao_item || it.descricao_item.includes('id_nomus') || it.descricao_item.startsWith('1,')).length})
+                  </button>
+                )}
                 <span className="bg-emerald-600 text-white px-2.5 py-1 rounded-md shadow-xs">
                   Área do Código: {focusedM2.toFixed(2)} m²
                 </span>
@@ -960,7 +984,9 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       </button>
                     </td>
                     <td className="p-3 text-slate-700 max-w-[200px] truncate" title={item.descricao_item}>
-                      {item.descricao_item}
+                      {(!item.descricao_item || item.descricao_item.includes('id_nomus') || item.descricao_item.startsWith('1,'))
+                        ? (DEFAULT_PRODUCT_CATALOG.find(c => c.codigo.toLowerCase() === (item.codigo_item || '').toLowerCase())?.descricao || item.descricao_item || 'CHAPA INOX 304 ESC - M2')
+                        : item.descricao_item}
                     </td>
                     <td className="p-3 text-center">
                       <div className="flex flex-col items-center gap-1">

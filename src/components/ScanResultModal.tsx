@@ -230,32 +230,58 @@ export function parseScannedPayload(
   const lines = text.split(/[\r\n]+/);
   for (const line of lines) {
     const lower = line.toLowerCase();
+    const isJsonLine = line.includes('{') || line.includes('"');
+
     if (!parsedIdNomus && (lower.includes('id nomus') || lower.includes('id:') || lower.startsWith('id '))) {
-      const parts = line.split(/[:=]/);
-      if (parts[1]) {
-        const val = parts[1].trim().split(/\s+/)[0];
-        if (/^\d{4}\.\d{2}\.\d{2}\.\d{4,}$/.test(val)) parsedIdNomus = val;
-        else if (parts[1].trim().length <= 30) parsedIdNomus = parts[1].trim();
+      if (!isJsonLine) {
+        const parts = line.split(/[:=]/);
+        if (parts[1]) {
+          const val = parts[1].trim().split(/\s+/)[0];
+          if (/^\d{4}\.\d{2}\.\d{2}\.\d{4,}$/.test(val)) parsedIdNomus = val;
+          else if (parts[1].trim().length <= 30) parsedIdNomus = parts[1].trim();
+        }
+      } else {
+        const jsonIdMatch = line.match(/"(?:id_nomus|idNomus|id)"\s*:\s*"([^"]*)"/i);
+        if (jsonIdMatch && jsonIdMatch[1].trim()) parsedIdNomus = jsonIdMatch[1].trim();
       }
     }
     if (!parsedCodigo && (lower.includes('cód') || lower.includes('cod:') || lower.includes('codigo:'))) {
-      const parts = line.split(/[:=]/);
-      if (parts[1]) {
-        const val = parts[1].trim().split(/\s+/)[0];
-        if (val) parsedCodigo = val;
+      if (!isJsonLine) {
+        const parts = line.split(/[:=]/);
+        if (parts[1]) {
+          const val = parts[1].trim().split(/\s+/)[0];
+          if (val && !val.includes('"') && !val.includes(',')) parsedCodigo = val;
+        }
+      } else {
+        const jsonCodMatch = line.match(/"(?:codigo|codigoItem|code|c)"\s*:\s*"([^"]*)"/i);
+        if (jsonCodMatch && jsonCodMatch[1].trim()) parsedCodigo = jsonCodMatch[1].trim();
       }
     }
     if (!parsedDesc && (lower.includes('desc') || lower.includes('descrição:') || lower.includes('descricao:'))) {
-      const parts = line.split(/[:=]/);
-      if (parts[1]) parsedDesc = parts[1].trim();
+      if (!isJsonLine) {
+        const parts = line.split(/[:=]/);
+        if (parts[1]) {
+          const val = parts.slice(1).join(':').trim();
+          if (val && !val.includes('"') && !val.includes(',') && !val.includes('id_nomus')) {
+            parsedDesc = val;
+          }
+        }
+      } else {
+        const jsonDescMatch = line.match(/"(?:desc|descricao|descricaoItem|d)"\s*:\s*"([^"]*)"/i);
+        if (jsonDescMatch && jsonDescMatch[1].trim() && !jsonDescMatch[1].includes('id_nomus')) {
+          parsedDesc = jsonDescMatch[1].trim();
+        }
+      }
     }
     if ((!parsedComprimentoMm || !parsedLarguraMm) && (lower.includes('medida:') || lower.includes('medida') || lower.includes('dimens'))) {
-      const parts = line.split(/[:=]/);
-      const val = parts[1] ? parts[1].trim() : line;
-      const dims = parseDimensionString(val);
-      if (!parsedComprimentoMm && dims.comprimento > 0) parsedComprimentoMm = dims.comprimento;
-      if (!parsedLarguraMm && dims.largura > 0) parsedLarguraMm = dims.largura;
-      if (!parsedEspessuraMm && dims.espessura > 0) parsedEspessuraMm = dims.espessura;
+      if (!isJsonLine) {
+        const parts = line.split(/[:=]/);
+        const val = parts[1] ? parts[1].trim() : line;
+        const dims = parseDimensionString(val);
+        if (!parsedComprimentoMm && dims.comprimento > 0) parsedComprimentoMm = dims.comprimento;
+        if (!parsedLarguraMm && dims.largura > 0) parsedLarguraMm = dims.largura;
+        if (!parsedEspessuraMm && dims.espessura > 0) parsedEspessuraMm = dims.espessura;
+      }
     }
   }
 
@@ -287,14 +313,27 @@ export function parseScannedPayload(
     }
   }
 
+  const isBogusDesc = (d: string) => 
+    !d || 
+    d.toLowerCase().startsWith('item') || 
+    d.includes('id_nomus') || 
+    d.startsWith('1,') || 
+    d.startsWith('{') || 
+    d.startsWith(':') ||
+    d.includes('":"');
+
   // Extract Description from text using lookahead before next section
-  if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
-    const descMatch = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n:;]+?)(?=\s*(?:medida|dimens|id|c[oó]d|peso|qtd|quantidade|$))/i);
-    if (descMatch) {
+  if (isBogusDesc(parsedDesc)) {
+    const descMatch = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n:;{}]+?)(?=\s*(?:medida|dimens|id|c[oó]d|peso|qtd|quantidade|$))/i);
+    if (descMatch && !isBogusDesc(descMatch[1].trim())) {
       parsedDesc = descMatch[1].trim();
     } else {
-      const fallbackDesc = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n,\"]+)/i);
-      if (fallbackDesc) parsedDesc = fallbackDesc[1].trim();
+      const fallbackDesc = text.match(/(?:descri[cç][aã]o(?:\s*do\s*produto)?|desc)\s*[:=-]\s*([^\r\n,\"{}:]+)/i);
+      if (fallbackDesc && !isBogusDesc(fallbackDesc[1].trim())) {
+        parsedDesc = fallbackDesc[1].trim();
+      } else {
+        parsedDesc = '';
+      }
     }
   }
 
@@ -392,10 +431,10 @@ export function parseScannedPayload(
   );
 
   if (matchedCat) {
-    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-') || parsedCodigo.includes('id_nomus')) {
       parsedCodigo = matchedCat.codigo;
     }
-    if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+    if (isBogusDesc(parsedDesc)) {
       parsedDesc = matchedCat.descricao;
     }
     if (!parsedComprimentoMm && matchedCat.comprimento_padrao_mm) {
@@ -411,10 +450,10 @@ export function parseScannedPayload(
       parsedUnidade = matchedCat.unidade;
     }
   } else if (matchedPerfilCat) {
-    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+    if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-') || parsedCodigo.includes('id_nomus')) {
       parsedCodigo = matchedPerfilCat.code;
     }
-    if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+    if (isBogusDesc(parsedDesc)) {
       parsedDesc = matchedPerfilCat.desc;
     }
   }
@@ -424,10 +463,10 @@ export function parseScannedPayload(
   if (cleanId && existingGerais && existingGerais.length > 0) {
     const existingWithId = existingGerais.find(g => (g.id_nomus || '').trim().toLowerCase() === cleanId);
     if (existingWithId) {
-      if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-')) {
+      if (!parsedCodigo || parsedCodigo.toUpperCase().startsWith('ITEM-') || parsedCodigo.includes('id_nomus')) {
         parsedCodigo = existingWithId.codigo_item;
       }
-      if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
+      if (isBogusDesc(parsedDesc) && !isBogusDesc(existingWithId.descricao_item)) {
         parsedDesc = existingWithId.descricao_item;
       }
       // ONLY copy dimensions if they are valid (not corrupted like 1mm length or 405mm thickness)
@@ -444,6 +483,11 @@ export function parseScannedPayload(
         parsedUnidade = existingWithId.unidade;
       }
     }
+  }
+
+  // Safety net: if description is still bogus, resolve from matched catalog
+  if (isBogusDesc(parsedDesc) && matchedCat) {
+    parsedDesc = matchedCat.descricao;
   }
 
   // If code is known and matches existing plate in inventory, copy description if missing

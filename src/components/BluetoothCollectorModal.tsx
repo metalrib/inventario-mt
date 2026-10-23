@@ -221,11 +221,23 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         return false;
       });
 
-      // CASE A-HEAL: If existing item was saved as ITEM-xxxx (e.g. from earlier scan issue) and we now have the true product code or active batch product
+      const isBogusDesc = (d?: string) => 
+        !d || 
+        d.toLowerCase().startsWith('item') || 
+        d.includes('id_nomus') || 
+        d.startsWith('1,') || 
+        d.startsWith('{') || 
+        d.startsWith(':') ||
+        d.includes('":"');
+
+      // CASE A-HEAL: If existing item was saved as ITEM-xxxx or had corrupted description (e.g. 1,"id_nomus")
       const effectiveBatchProd = matchedCatalog || activeBatchProduct;
-      if (existingGeral && (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-') && (parsed.codigoItem || effectiveBatchProd)) {
-        const healCode = parsed.codigoItem || effectiveBatchProd?.codigo || '';
-        const healDesc = parsed.descItem || effectiveBatchProd?.descricao || existingGeral.descricao_item;
+      const isCorruptedDesc = existingGeral ? isBogusDesc(existingGeral.descricao_item) : false;
+      const isCorruptedCode = existingGeral ? ((existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-') || (existingGeral.codigo_item || '').includes('id_nomus')) : false;
+
+      if (existingGeral && (isCorruptedCode || isCorruptedDesc) && (parsed.codigoItem || effectiveBatchProd)) {
+        const healCode = (parsed.codigoItem && !parsed.codigoItem.includes('id_nomus')) ? parsed.codigoItem : (effectiveBatchProd?.codigo || existingGeral.codigo_item || '023.0116');
+        const healDesc = (!isBogusDesc(parsed.descItem) ? parsed.descItem : null) || effectiveBatchProd?.descricao || 'CHAPA INOX 304 ESC - M2';
         const healComp = parsed.comprimentoMm || effectiveBatchProd?.comprimento_padrao_mm || existingGeral.comprimento_mm || 0;
         const healLarg = parsed.larguraMm || effectiveBatchProd?.largura_padrao_mm || existingGeral.largura_mm || 0;
         const healEsp = parsed.espessuraMm || effectiveBatchProd?.espessura_padrao_mm || existingGeral.espessura_mm || 0;
@@ -286,15 +298,15 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
           ? parsed.espessuraMm
           : (!hasCorruptedDims ? (existingGeral.espessura_mm || 0) : (healProd?.espessura_padrao_mm || 0.5));
 
-        let finalCod = (parsed.codigoItem && !parsed.codigoItem.toUpperCase().startsWith('ITEM-'))
+        let finalCod = (parsed.codigoItem && !parsed.codigoItem.toUpperCase().startsWith('ITEM-') && !parsed.codigoItem.includes('id_nomus'))
           ? parsed.codigoItem
-          : ((existingGeral.codigo_item && !existingGeral.codigo_item.toUpperCase().startsWith('ITEM-'))
+          : ((existingGeral.codigo_item && !existingGeral.codigo_item.toUpperCase().startsWith('ITEM-') && !existingGeral.codigo_item.includes('id_nomus'))
               ? existingGeral.codigo_item
               : (healProd?.codigo || '023.0116'));
 
-        let finalDesc = (parsed.descItem && !parsed.descItem.toLowerCase().startsWith('item'))
+        let finalDesc = (!isBogusDesc(parsed.descItem))
           ? parsed.descItem
-          : ((existingGeral.descricao_item && !existingGeral.descricao_item.toLowerCase().startsWith('item'))
+          : ((existingGeral.descricao_item && !isBogusDesc(existingGeral.descricao_item))
               ? existingGeral.descricao_item
               : (healProd?.descricao || 'CHAPA INOX 304 ESC - M2'));
 
@@ -400,8 +412,13 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         targetCat = 'geral';
       }
 
-      const finalCodigo = parsed.codigoItem || effectiveProd?.codigo || '';
-      const finalDesc = parsed.descItem || effectiveProd?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : ''));
+      const finalCodigo = (parsed.codigoItem && !parsed.codigoItem.includes('id_nomus')) 
+        ? parsed.codigoItem 
+        : (effectiveProd?.codigo || '023.0116');
+
+      const finalDesc = (!isBogusDesc(parsed.descItem)) 
+        ? parsed.descItem 
+        : (effectiveProd?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : 'CHAPA INOX 304 ESC - M2')));
       
       // Robust dimension validation (discards bogus 1mm length, 304mm width, or >50mm thickness)
       let finalComprimento = (parsed.comprimentoMm && parsed.comprimentoMm > 10)
