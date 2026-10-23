@@ -1,6 +1,6 @@
 // Componente Modal do Leitor de QR Code e Código de Barras
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, Barcode, Check, RefreshCw, Zap, Image as ImageIcon, Flashlight, AlertCircle } from 'lucide-react';
+import { X, Camera, Barcode, Check, RefreshCw, Zap, Image as ImageIcon, Flashlight, AlertCircle, ArrowRight } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats, CameraDevice } from 'html5-qrcode';
 
 interface ScannerModalProps {
@@ -8,13 +8,15 @@ interface ScannerModalProps {
   onClose: () => void;
   onScanResult?: (code: string) => void;
   onScan?: (code: string) => void;
+  onOpenBluetoothCollector?: () => void;
 }
 
 export const ScannerModal: React.FC<ScannerModalProps> = ({
   isOpen,
   onClose,
   onScanResult,
-  onScan
+  onScan,
+  onOpenBluetoothCollector
 }) => {
   const [manualCode, setManualCode] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -361,6 +363,27 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             <X size={20} />
           </button>
         </div>
+
+        {onOpenBluetoothCollector && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-[#1b367c]">
+              <span className="text-base">🔫</span>
+              <span className="font-extrabold">Tem uma pistola Bluetooth / leitor USB?</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                stopCamera();
+                onClose();
+                onOpenBluetoothCollector();
+              }}
+              className="bg-[#1b367c] hover:bg-[#14275b] text-white font-extrabold px-3 py-1.5 rounded-lg text-xs shadow-xs cursor-pointer flex items-center gap-1 transition-all"
+            >
+              <span>Abrir Modo Bipador Contínuo</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        )}
 
         <div className="p-4 space-y-3.5">
           {/* Camera View Area */}

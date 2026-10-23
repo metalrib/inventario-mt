@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GeralItem, FilterState } from '../types';
-import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square } from 'lucide-react';
+import { Search, Printer, Trash2, Edit2, ArrowUpDown, Check, X, Tag, Package, FileSpreadsheet, RefreshCw, CheckSquare, Square, Filter, Layers, CheckCircle, ChevronRight, Eye } from 'lucide-react';
 import { exportGeraisXLSX } from '../services/exporter';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
@@ -19,6 +19,8 @@ interface GeralTableProps {
   onPrintBatch?: (items: GeralItem[]) => void;
   onOpenSinglePrint?: (item: GeralItem) => void;
   onPrintSingle?: (item: GeralItem) => void;
+  initialProductCodeFilter?: string | null;
+  onSelectProductCode?: (code: string | null) => void;
 }
 
 export const GeralTable: React.FC<GeralTableProps> = ({
@@ -35,7 +37,9 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   onOpenBatchPrint,
   onPrintBatch,
   onOpenSinglePrint,
-  onPrintSingle
+  onPrintSingle,
+  initialProductCodeFilter = null,
+  onSelectProductCode
 }) => {
   const itemList = items || gerais || [];
   const handleClear = onClearAll || onClearGerais || (() => {});
@@ -47,6 +51,91 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editForm, setEditForm] = useState<Partial<GeralItem>>({});
+
+  // Product Code Separation / Focus Mode State (Option A)
+  const [selectedProductCode, setSelectedProductCode] = useState<string | null>(initialProductCodeFilter);
+  const [codeFilterSearch, setCodeFilterSearch] = useState<string>('');
+
+  // Handle setting product code and notifying parent if provided
+  const handleSetProductCode = (code: string | null) => {
+    setSelectedProductCode(code);
+    if (onSelectProductCode) {
+      onSelectProductCode(code);
+    }
+  };
+
+  // Group and summarize inventory items by product code
+  const productGroups = useMemo(() => {
+    const map = new Map<string, {
+      codigo: string;
+      descricao: string;
+      count: number;
+      totalQty: number;
+      totalM2: number;
+    }>();
+
+    itemList.forEach(item => {
+      if (!item) return;
+      const code = item.codigo_item?.trim() || 'SEM-CODIGO';
+      const existing = map.get(code);
+
+      const isM2 = item.unidade === 'm²' || item.unidade === 'metros quadrados' || item.unidade === 'm2';
+      let m2 = 0;
+      if (item.comprimento_mm && item.largura_mm) {
+        const val = Number(item.quantidade) || 0;
+        if (isM2 && val >= 1 && Number.isInteger(val)) {
+          m2 = ((item.comprimento_mm * item.largura_mm) / 1000000) * val;
+        } else {
+          m2 = val > 0 && isM2 ? val : ((item.comprimento_mm * item.largura_mm) / 1000000) * (val || 1);
+        }
+      } else if (isM2) {
+        m2 = Number(item.quantidade) || 0;
+      }
+
+      let qty = 1;
+      if (isM2) {
+        const val = Number(item.quantidade) || 0;
+        qty = val >= 1 && Number.isInteger(val) ? val : 1;
+      } else {
+        qty = Number(item.quantidade) || 0;
+      }
+
+      if (existing) {
+        existing.count += 1;
+        existing.totalQty += qty;
+        existing.totalM2 += m2;
+        if (!existing.descricao && item.descricao_item) {
+          existing.descricao = item.descricao_item;
+        }
+      } else {
+        map.set(code, {
+          codigo: code,
+          descricao: item.descricao_item || '',
+          count: 1,
+          totalQty: qty,
+          totalM2: m2
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [itemList]);
+
+  // Filtered product groups for code chips search
+  const visibleProductGroups = useMemo(() => {
+    if (!codeFilterSearch.trim()) return productGroups;
+    const term = codeFilterSearch.toLowerCase().trim();
+    return productGroups.filter(g =>
+      g.codigo.toLowerCase().includes(term) ||
+      g.descricao.toLowerCase().includes(term)
+    );
+  }, [productGroups, codeFilterSearch]);
+
+  // Active product group details
+  const activeProductGroup = useMemo(() => {
+    if (!selectedProductCode) return null;
+    return productGroups.find(g => g.codigo === selectedProductCode) || null;
+  }, [productGroups, selectedProductCode]);
 
   // Deletion modals state
   const [itemToDelete, setItemToDelete] = useState<GeralItem | null>(null);
@@ -65,6 +154,13 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   // Filter and Sort
   const filteredItems = itemList.filter(item => {
     if (!item) return false;
+
+    // Filter by selected product code (Option A: separação limpa por código)
+    if (selectedProductCode) {
+      const code = item.codigo_item?.trim() || 'SEM-CODIGO';
+      if (code !== selectedProductCode) return false;
+    }
+
     const searchLower = filters.search.toLowerCase();
     const matchSearch =
       !filters.search ||
@@ -90,7 +186,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
     return (dateA - dateB) * factor;
   });
 
-  // Totals
+  // Global Totals (All items)
   const totalM2 = itemList.reduce((acc, i) => {
     if (!i) return acc;
     const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
@@ -111,6 +207,37 @@ export const GeralTable: React.FC<GeralTableProps> = ({
   }, 0);
 
   const totalQty = itemList.reduce((acc, i) => {
+    if (!i) return acc;
+    const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
+    if (isM2) {
+      const val = Number(i.quantidade) || 0;
+      if (val >= 1 && Number.isInteger(val)) return acc + val;
+      return acc + 1;
+    }
+    return acc + (Number(i.quantidade) || 0);
+  }, 0);
+
+  // Focused Totals (Currently visible in view)
+  const focusedM2 = filteredItems.reduce((acc, i) => {
+    if (!i) return acc;
+    const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
+    if (i.comprimento_mm && i.largura_mm) {
+      if (isM2) {
+        const val = Number(i.quantidade) || 0;
+        if (val >= 1 && Number.isInteger(val)) {
+          return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * val;
+        }
+        return acc + (val > 0 ? val : ((i.comprimento_mm * i.largura_mm) / 1000000));
+      }
+      return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * (Number(i.quantidade) || 1);
+    }
+    if (isM2) {
+      return acc + (Number(i.quantidade) || 0);
+    }
+    return acc;
+  }, 0);
+
+  const focusedQty = filteredItems.reduce((acc, i) => {
     if (!i) return acc;
     const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
     if (isM2) {
@@ -224,14 +351,28 @@ export const GeralTable: React.FC<GeralTableProps> = ({
           <h2 className="font-extrabold text-base text-[#1b367c] flex items-center gap-2">
             <span>Chapas e Insumos Cadastrados</span>
             <span className="text-xs font-bold px-2.5 py-0.5 bg-blue-100 text-[#1b367c] rounded-full">
-              {itemList.length} registros
+              {selectedProductCode ? `${filteredItems.length} de ${itemList.length} chapas` : `${itemList.length} registros`}
             </span>
+            {selectedProductCode && (
+              <span className="text-[11px] font-extrabold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
+                Foco no Código {selectedProductCode}
+              </span>
+            )}
           </h2>
           <div className="text-xs text-slate-500 font-medium mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>Total: <strong className="text-slate-800 font-extrabold">{totalQty} unidades/chapas</strong></span>
+            <span>
+              {selectedProductCode ? (
+                <>Visíveis deste código: <strong className="text-slate-800 font-extrabold">{focusedQty} unidades/chapas</strong></>
+              ) : (
+                <>Total: <strong className="text-slate-800 font-extrabold">{totalQty} unidades/chapas</strong></>
+              )}
+            </span>
             <span className="text-slate-300 hidden sm:inline">•</span>
             <span className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-2.5 py-0.5 rounded-md font-bold">
-              Área Total Acumulada: <strong className="text-emerald-800 font-black">{totalM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²</strong>
+              {selectedProductCode ? 'Área Deste Código: ' : 'Área Total Acumulada: '}
+              <strong className="text-emerald-800 font-black">
+                {(selectedProductCode ? focusedM2 : totalM2).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} m²
+              </strong>
             </span>
           </div>
         </div>
@@ -248,6 +389,154 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         )}
       </div>
 
+      {/* Product Code Selector Bar (Opção A - Pastas / Abas por Código de Produto) */}
+      {productGroups.length > 0 && (
+        <div className="bg-gradient-to-r from-slate-50 via-blue-50/20 to-slate-50 p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-[#1b367c] text-white rounded-lg shadow-xs">
+                <Layers size={15} />
+              </span>
+              <div>
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                  Separar Chapas por Código de Produto
+                </span>
+                <span className="ml-2 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#1b367c]">
+                  {productGroups.length} {productGroups.length === 1 ? 'código no estoque' : 'códigos no estoque'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {productGroups.length > 3 && (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={codeFilterSearch}
+                    onChange={e => setCodeFilterSearch(e.target.value)}
+                    placeholder="Buscar código..."
+                    className="h-7 w-32 sm:w-40 pl-6 pr-6 text-[11px] bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#1b367c]"
+                  />
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  {codeFilterSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCodeFilterSearch('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {selectedProductCode !== null && (
+                <button
+                  type="button"
+                  onClick={() => handleSetProductCode(null)}
+                  className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                >
+                  <X size={12} />
+                  <span>Ver Todas ({itemList.length})</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Cards / Chips strip */}
+          <div className="flex flex-wrap items-stretch gap-2 pt-1 max-h-48 overflow-y-auto">
+            {/* All items card */}
+            <button
+              type="button"
+              onClick={() => handleSetProductCode(null)}
+              className={`text-left px-3.5 py-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between min-w-[140px] shrink-0 ${
+                selectedProductCode === null
+                  ? 'bg-[#1b367c] text-white border-[#1b367c] shadow-md ring-2 ring-blue-300'
+                  : 'bg-white hover:bg-slate-100/90 text-slate-700 border-slate-200 shadow-xs'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black">Todas as Chapas</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedProductCode === null ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                  {itemList.length}
+                </span>
+              </div>
+              <span className={`text-[10px] mt-1 font-semibold ${selectedProductCode === null ? 'text-blue-100' : 'text-slate-500'}`}>
+                {totalM2.toFixed(2)} m² acumulado
+              </span>
+            </button>
+
+            {/* Individual Product Code Cards */}
+            {visibleProductGroups.map(group => {
+              const isSelected = selectedProductCode === group.codigo;
+              return (
+                <button
+                  key={group.codigo}
+                  type="button"
+                  onClick={() => handleSetProductCode(isSelected ? null : group.codigo)}
+                  title={`${group.codigo} - ${group.descricao} (${group.count} chapas cadastradas)`}
+                  className={`text-left px-3 py-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between min-w-[155px] max-w-[240px] shrink-0 ${
+                    isSelected
+                      ? 'bg-[#1b367c] text-white border-[#13275b] shadow-md ring-2 ring-blue-300'
+                      : 'bg-white hover:bg-blue-50/80 text-slate-800 border-slate-200 hover:border-blue-300 shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono font-black text-xs tracking-tight truncate">
+                      {group.codigo}
+                    </span>
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-white/25 text-white' : 'bg-blue-100 text-[#1b367c]'
+                    }`}>
+                      {group.count} {group.count === 1 ? 'pç' : 'pçs'}
+                    </span>
+                  </div>
+                  {group.descricao && (
+                    <span className={`text-[10px] truncate max-w-[190px] mt-0.5 ${
+                      isSelected ? 'text-blue-100' : 'text-slate-600 font-medium'
+                    }`}>
+                      {group.descricao}
+                    </span>
+                  )}
+                  <div className="flex items-center justify-between text-[10px] font-bold mt-1">
+                    <span className={isSelected ? 'text-emerald-300 font-extrabold' : 'text-emerald-700'}>
+                      {group.totalM2.toFixed(2)} m²
+                    </span>
+                    <span className={`text-[9px] ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
+                      {group.totalQty} un.
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Focused mode informative banner */}
+          {selectedProductCode && activeProductGroup && (
+            <div className="p-2.5 bg-blue-100/80 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={15} className="text-[#1b367c] shrink-0" />
+                <span className="text-xs text-[#1b367c]">
+                  Modo Focado Ativo: Exibindo <strong>apenas as {filteredItems.length} chapas</strong> do código <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-blue-200 text-slate-900">{selectedProductCode}</strong> {activeProductGroup.descricao ? `— ${activeProductGroup.descricao}` : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold shrink-0">
+                <span className="bg-emerald-600 text-white px-2.5 py-1 rounded-md shadow-xs">
+                  Área do Código: {focusedM2.toFixed(2)} m²
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetProductCode(null)}
+                  className="text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-300 transition-colors cursor-pointer shadow-xs"
+                >
+                  ✕ Ver Todos os Códigos
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Search and Action Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="relative flex-1">
@@ -256,7 +545,7 @@ export const GeralTable: React.FC<GeralTableProps> = ({
             type="text"
             value={filters.search}
             onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
-            placeholder="Buscar por código (XXX.XXXX), descrição, ID Nomus..."
+            placeholder={selectedProductCode ? `Buscar nas chapas do código ${selectedProductCode}...` : "Buscar por código (XXX.XXXX), descrição, ID Nomus..."}
             className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#1b367c] bg-slate-50 focus:bg-white"
           />
         </div>
@@ -264,13 +553,13 @@ export const GeralTable: React.FC<GeralTableProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => exportGeraisXLSX(itemList)}
-            disabled={itemList.length === 0}
+            onClick={() => exportGeraisXLSX(selectedProductCode ? filteredItems : itemList)}
+            disabled={filteredItems.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs px-3.5 h-10 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
-            title="Exportar tabela de insumos e chapas para Excel (.xlsx)"
+            title={selectedProductCode ? `Exportar Excel das ${filteredItems.length} chapas do código ${selectedProductCode}` : "Exportar tabela de insumos e chapas para Excel (.xlsx)"}
           >
             <FileSpreadsheet size={16} />
-            <span>Exportar Excel (.xlsx)</span>
+            <span>{selectedProductCode ? `Exportar Excel (${filteredItems.length})` : 'Exportar Excel (.xlsx)'}</span>
           </button>
 
           {selectedIds.length > 0 && (
@@ -358,8 +647,29 @@ export const GeralTable: React.FC<GeralTableProps> = ({
               <tr>
                 <td colSpan={8} className="p-8 text-center text-slate-400">
                   <Package size={32} className="mx-auto mb-2 text-slate-300" />
-                  <p className="font-bold">Nenhum item ou chapa cadastrado ainda.</p>
-                  <p className="text-[11px]">Use o formulário acima para registrar novos insumos.</p>
+                  {selectedProductCode ? (
+                    <div className="space-y-2">
+                      <p className="font-bold text-slate-700">Nenhuma chapa encontrada para o código "{selectedProductCode}".</p>
+                      <button
+                        type="button"
+                        onClick={() => handleSetProductCode(null)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#1b367c] bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                      >
+                        <X size={13} />
+                        <span>Ver todas as chapas ({itemList.length})</span>
+                      </button>
+                    </div>
+                  ) : filters.search ? (
+                    <div>
+                      <p className="font-bold text-slate-700">Nenhum item encontrado para a busca "{filters.search}".</p>
+                      <p className="text-[11px] text-slate-400">Tente buscar por outro código, ID ou descrição.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-bold text-slate-700">Nenhum item ou chapa cadastrado ainda.</p>
+                      <p className="text-[11px]">Use o formulário acima para registrar novos insumos.</p>
+                    </div>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -479,7 +789,19 @@ export const GeralTable: React.FC<GeralTableProps> = ({
                       {item.id_nomus || <span className="text-slate-400 font-normal italic text-xs">Sem ID</span>}
                     </td>
                     <td className="p-3 font-extrabold text-slate-900">
-                      {item.codigo_item}
+                      <button
+                        type="button"
+                        onClick={() => handleSetProductCode(selectedProductCode === item.codigo_item ? null : item.codigo_item)}
+                        title={selectedProductCode === item.codigo_item ? "Remover foco deste código" : `Filtrar apenas chapas do código ${item.codigo_item}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer group ${
+                          selectedProductCode === item.codigo_item
+                            ? 'bg-[#1b367c] text-white shadow-xs ring-1 ring-blue-300'
+                            : 'bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-[#1b367c] border border-slate-200'
+                        }`}
+                      >
+                        <span>{item.codigo_item}</span>
+                        <Filter size={11} className={selectedProductCode === item.codigo_item ? 'text-blue-200' : 'text-slate-400 opacity-60 group-hover:opacity-100'} />
+                      </button>
                     </td>
                     <td className="p-3 text-slate-700 max-w-[200px] truncate" title={item.descricao_item}>
                       {item.descricao_item}

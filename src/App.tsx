@@ -13,6 +13,7 @@ import { ProductCatalogModal } from './components/ProductCatalogModal';
 import { LabelPrintModal, PrintItem } from './components/LabelPrintModal';
 import { EditModal } from './components/EditModal';
 import { ScannerModal } from './components/ScannerModal';
+import { BluetoothCollectorModal } from './components/BluetoothCollectorModal';
 import { ScanResultModal } from './components/ScanResultModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MetricsDashboard } from './components/MetricsDashboard';
@@ -81,10 +82,60 @@ export default function App() {
   const [editingItemType, setEditingItemType] = useState<'perfil' | 'bumper'>('perfil');
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isBluetoothCollectorOpen, setIsBluetoothCollectorOpen] = useState(false);
   const [scannedCodeForModal, setScannedCodeForModal] = useState<string | null>(null);
   const [isScanResultOpen, setIsScanResultOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Global Barcode Gun Keystroke Detector (HID keyboard emulation)
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If user is actively typing in a standard input or textarea, let normal typing happen
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      );
+
+      // If Bluetooth collector modal is already open, it handles its own input directly
+      if (isBluetoothCollectorOpen) return;
+
+      const now = Date.now();
+      const diff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      // Scanners typically send keystrokes < 50ms apart followed by Enter
+      if (e.key === 'Enter') {
+        if (buffer.length >= 3 && (diff < 90 || !isInput)) {
+          const scannedCode = buffer.trim();
+          buffer = '';
+          if (scannedCode) {
+            e.preventDefault();
+            setIsBluetoothCollectorOpen(true);
+          }
+        } else {
+          buffer = '';
+        }
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (diff > 120 && !isInput) {
+          buffer = e.key;
+        } else {
+          buffer += e.key;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBluetoothCollectorOpen]);
 
   // REAL-TIME FIRESTORE SUBSCRIPTIONS
   useEffect(() => {
@@ -472,6 +523,7 @@ export default function App() {
         onSyncNow={handleManualSync}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
+        onOpenBluetoothCollector={() => setIsBluetoothCollectorOpen(true)}
         onOpenCatalog={() => setIsProductCatalogOpen(true)}
         catalogCount={safeCatalog.length}
         totalPerfisMeters={totalPerfisMeters}
@@ -596,6 +648,7 @@ export default function App() {
                 onOpenCatalogModal={() => setIsProductCatalogOpen(true)}
                 operadorPadrao={config.operadorPadrao}
                 onPrintGeralItem={handlePrintSingleGeral}
+                gerais={gerais}
               />
             </div>
 
@@ -681,6 +734,45 @@ export default function App() {
         onScan={(code) => {
           setScannedCodeForModal(code);
           setIsScanResultOpen(true);
+        }}
+        onOpenBluetoothCollector={() => {
+          setIsScannerOpen(false);
+          setIsBluetoothCollectorOpen(true);
+        }}
+      />
+
+      {/* High-Speed Bluetooth Barcode Gun / Continuous Collector Modal */}
+      <BluetoothCollectorModal
+        isOpen={isBluetoothCollectorOpen}
+        onClose={() => setIsBluetoothCollectorOpen(false)}
+        perfis={safePerfis}
+        bumpers={safeBumpers}
+        gerais={safeGerais}
+        productCatalog={safeCatalog}
+        appMode={appMode}
+        operadorPadrao={config.operadorPadrao || 'Operador Produção'}
+        onAddPerfil={handleSavePerfil}
+        onAddBumper={async (b) => {
+          await handleSaveBumper({
+            tipo: b.tipo,
+            codigo: b.codigo,
+            medida_mm: b.medida_mm,
+            quantidade: b.quantidade,
+            operador: b.operador,
+            id_nomus: b.id_nomus
+          });
+        }}
+        onAddGeral={handleSaveGeral}
+        onUpdatePerfil={handleEditPerfil}
+        onUpdateBumper={handleEditBumper}
+        onUpdateGeral={handleEditGeral}
+        onOpenManualModal={(code) => {
+          setScannedCodeForModal(code);
+          setIsScanResultOpen(true);
+        }}
+        onOpenCameraScanner={() => {
+          setIsBluetoothCollectorOpen(false);
+          setIsScannerOpen(true);
         }}
       />
 

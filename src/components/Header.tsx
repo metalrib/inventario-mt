@@ -8,6 +8,7 @@ interface HeaderProps {
   onSyncNow?: () => void;
   onOpenSettings: () => void;
   onOpenScanner: () => void;
+  onOpenBluetoothCollector?: () => void;
   onOpenCatalog?: () => void;
   catalogCount?: number;
   totalPerfisMeters: number;
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSyncNow,
   onOpenSettings,
   onOpenScanner,
+  onOpenBluetoothCollector,
   onOpenCatalog,
   catalogCount = 0,
   totalPerfisMeters,
@@ -247,6 +249,20 @@ export const Header: React.FC<HeaderProps> = ({
                 {catalogCount}
               </span>
             )}
+          </button>
+        )}
+
+        {/* Bluetooth Handheld Barcode Gun Trigger */}
+        {onOpenBluetoothCollector && (
+          <button
+            type="button"
+            onClick={onOpenBluetoothCollector}
+            className="bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-900 font-black text-xs px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border border-emerald-300 cursor-pointer shadow-xs shrink-0 ring-1 ring-emerald-200"
+            title="Abrir Modo Bipador Rápido Bluetooth (Pistola HID Contínua sem cliques)"
+          >
+            <span className="text-sm leading-none">🔫</span>
+            <span>Bipador Bluetooth</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           </button>
         )}
 

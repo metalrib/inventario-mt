@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp, Palette, Layers, Clock } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
 import { findCatalogProductByCode, generateUniqueNomusId, generateNomusIdSequence, formatNomusIdInput } from '../services/firebase';
@@ -20,6 +20,7 @@ interface GeralFormProps {
   prefilledProductItem?: ProductCatalogItem | null;
   onClearPrefilledProduct?: () => void;
   existingNomusIds?: string[];
+  gerais?: GeralItem[];
 }
 
 export const GeralForm: React.FC<GeralFormProps> = ({
@@ -38,7 +39,8 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   prefilledItem,
   prefilledProductItem,
   onClearPrefilledProduct,
-  existingNomusIds = []
+  existingNomusIds = [],
+  gerais = []
 }) => {
   const activeCatalog = catalog.length > 0 ? catalog : (productCatalog || []);
   const handleSave = onSaveGeral || onAddItem;
@@ -58,6 +60,32 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const [saveToCatalogCheck, setSaveToCatalogCheck] = useState(true);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+
+  // Existing plates count and area for the current product code
+  const existingStockForCode = useMemo(() => {
+    if (!codigoItem.trim() || !gerais || gerais.length === 0) return null;
+    const code = codigoItem.trim().toUpperCase();
+    const matches = gerais.filter(g => (g.codigo_item || '').trim().toUpperCase() === code);
+    if (matches.length === 0) return null;
+
+    const totalM2 = matches.reduce((acc, i) => {
+      const isM2 = i.unidade === 'm²' || i.unidade === 'metros quadrados' || i.unidade === 'm2';
+      if (i.comprimento_mm && i.largura_mm) {
+        const val = Number(i.quantidade) || 0;
+        if (isM2 && val >= 1 && Number.isInteger(val)) {
+          return acc + ((i.comprimento_mm * i.largura_mm) / 1000000) * val;
+        }
+        return acc + (val > 0 ? val : ((i.comprimento_mm * i.largura_mm) / 1000000));
+      }
+      if (isM2) return acc + (Number(i.quantidade) || 0);
+      return acc;
+    }, 0);
+
+    return {
+      count: matches.length,
+      totalM2
+    };
+  }, [codigoItem, gerais]);
 
   // Split multiple sheets into individual rows with +1 minute IDs
   const [desmembrarChapas, setDesmembrarChapas] = useState<boolean>(() => {
@@ -773,6 +801,15 @@ export const GeralForm: React.FC<GeralFormProps> = ({
             <span className="text-[10px] text-slate-400 mt-0.5 block">
               Digite o código ou parte da descrição para buscar.
             </span>
+
+            {existingStockForCode && (
+              <div className="mt-1.5 flex items-center justify-between text-[11px] bg-blue-50 border border-blue-200 text-[#1b367c] px-2.5 py-1 rounded-lg animate-fadeIn">
+                <span className="font-bold flex items-center gap-1.5">
+                  <Package size={13} className="text-[#1b367c] shrink-0" />
+                  <span>Cadastradas deste código: <strong>{existingStockForCode.count} {existingStockForCode.count === 1 ? 'chapa' : 'chapas'}</strong> ({existingStockForCode.totalM2.toFixed(2)} m²)</span>
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Descrição do Item */}
