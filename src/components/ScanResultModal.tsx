@@ -218,20 +218,62 @@ export function parseScannedPayload(
 
   // Extract Dimensions: e.g. 1740 x 850 x 0.5 MM
   if (!parsedComprimentoMm || !parsedLarguraMm) {
-    const dimMatch = text.match(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?))?/);
-    if (dimMatch) {
-      if (!parsedComprimentoMm) parsedComprimentoMm = parseFloat(dimMatch[1].replace(',', '.')) || 0;
-      if (!parsedLarguraMm) parsedLarguraMm = parseFloat(dimMatch[2].replace(',', '.')) || 0;
-      if (!parsedEspessuraMm && dimMatch[3]) {
-        parsedEspessuraMm = parseFloat(dimMatch[3].replace(',', '.')) || 0;
+    const allMatches = [...text.matchAll(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?))?/g)];
+    
+    let validComp = 0;
+    let validLarg = 0;
+    let validEsp = 0;
+
+    for (const m of allMatches) {
+      const n1 = parseFloat(m[1].replace(',', '.'));
+      const n2 = parseFloat(m[2].replace(',', '.'));
+      const n3 = m[3] ? parseFloat(m[3].replace(',', '.')) : 0;
+
+      // Reject false matches where n1 is quantity (<= 10) or n2 is material grade 304/430
+      if (n1 <= 10) continue;
+      if ((n2 === 304 || n2 === 430 || n2 === 316) && n1 <= 50) continue;
+
+      // Standard 3-part: Length >= 50, Width >= 50, Thickness <= 50 (e.g. 1740 x 850 x 0.5)
+      if (n1 >= 50 && n2 >= 50 && n3 <= 50) {
+        validComp = n1;
+        validLarg = n2;
+        validEsp = n3;
+        break;
       }
-    } else if (!parsedComprimentoMm) {
-      const singleMm = text.match(/(\d+(?:[.,]\d+)?)\s*(?:mm|mil[ií]metros)/i);
+
+      // Format Thickness x Length x Width: e.g. 0.50 x 1740 x 850
+      if (n1 <= 50 && n2 >= 50 && n3 >= 50) {
+        validEsp = n1;
+        validComp = n2;
+        validLarg = n3;
+        break;
+      }
+
+      // 2-part format: Length x Width (e.g. 1740 x 850)
+      if (n1 >= 50 && n2 >= 50 && n3 === 0) {
+        validComp = n1;
+        validLarg = n2;
+        break;
+      }
+    }
+
+    if (validComp > 0) parsedComprimentoMm = validComp;
+    if (validLarg > 0) parsedLarguraMm = validLarg;
+    if (validEsp > 0) parsedEspessuraMm = validEsp;
+
+    // Single length with explicit "mm" (e.g. 3000 mm for profiles)
+    if (!parsedComprimentoMm) {
+      const singleMm = text.match(/(\d{2,5}(?:[.,]\d+)?)\s*(?:mm|mil[ií]metros)/i);
       if (singleMm) {
-        parsedComprimentoMm = parseFloat(singleMm[1].replace(',', '.')) || 0;
+        const val = parseFloat(singleMm[1].replace(',', '.')) || 0;
+        if (val >= 50) parsedComprimentoMm = val;
       }
     }
   }
+
+  // Sanity check: length cannot be <= 10mm for a sheet or profile, and thickness cannot exceed 50mm
+  if (parsedComprimentoMm <= 10) parsedComprimentoMm = 0;
+  if (parsedEspessuraMm > 50) parsedEspessuraMm = 0;
 
   // 4. Single code or plain string fallback if nothing parsed
   if (!parsedIdNomus && !parsedCodigo) {
@@ -285,7 +327,7 @@ export function parseScannedPayload(
   }
 
   // 6. EXISTING INVENTORY ENRICHMENT:
-  // If we have an existing plate with this Nomus ID, retrieve its full details
+  // If we have an existing plate with this Nomus ID, retrieve its details ONLY if valid
   if (cleanId && existingGerais && existingGerais.length > 0) {
     const existingWithId = existingGerais.find(g => (g.id_nomus || '').trim().toLowerCase() === cleanId);
     if (existingWithId) {
@@ -295,13 +337,14 @@ export function parseScannedPayload(
       if (!parsedDesc || parsedDesc.toLowerCase().startsWith('item')) {
         parsedDesc = existingWithId.descricao_item;
       }
-      if (!parsedComprimentoMm && existingWithId.comprimento_mm) {
+      // ONLY copy dimensions if they are valid (not corrupted like 1mm length or 405mm thickness)
+      if (!parsedComprimentoMm && (existingWithId.comprimento_mm || 0) > 10) {
         parsedComprimentoMm = existingWithId.comprimento_mm;
       }
-      if (!parsedLarguraMm && existingWithId.largura_mm) {
+      if (!parsedLarguraMm && (existingWithId.largura_mm || 0) > 10) {
         parsedLarguraMm = existingWithId.largura_mm;
       }
-      if (!parsedEspessuraMm && existingWithId.espessura_mm) {
+      if (!parsedEspessuraMm && (existingWithId.espessura_mm || 0) > 0 && (existingWithId.espessura_mm || 0) <= 50) {
         parsedEspessuraMm = existingWithId.espessura_mm;
       }
       if (!parsedUnidade && existingWithId.unidade) {

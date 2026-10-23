@@ -221,13 +221,24 @@ export function subscribeToCatalog(onUpdate: (items: ProductCatalogItem[]) => vo
         ...(d.data() as Omit<ProductCatalogItem, 'id'>)
       }));
 
-      // Merge com catálogo padrão para garantir que itens base não sumam
+      // Merge com catálogo padrão para garantir que itens base não sumam nem percam medidas padrão
       const map = new Map<string, ProductCatalogItem>();
       for (const def of DEFAULT_PRODUCT_CATALOG) {
         if (def.codigo) map.set(def.codigo.trim().toUpperCase(), def);
       }
       for (const rem of remoteItems) {
-        if (rem.codigo) map.set(rem.codigo.trim().toUpperCase(), rem);
+        if (rem.codigo) {
+          const key = rem.codigo.trim().toUpperCase();
+          const baseDef = map.get(key);
+          map.set(key, {
+            ...baseDef,
+            ...rem,
+            comprimento_padrao_mm: rem.comprimento_padrao_mm || baseDef?.comprimento_padrao_mm || 0,
+            largura_padrao_mm: rem.largura_padrao_mm || baseDef?.largura_padrao_mm || 0,
+            espessura_padrao_mm: rem.espessura_padrao_mm || baseDef?.espessura_padrao_mm || 0,
+            medida_padrao_mm: rem.medida_padrao_mm || baseDef?.medida_padrao_mm || 0
+          });
+        }
       }
       const merged = Array.from(map.values());
       saveLocalCatalog(merged);
@@ -563,10 +574,32 @@ export async function fetchCatalog(): Promise<ProductCatalogItem[]> {
       if (def.codigo) map.set(def.codigo.trim().toUpperCase(), def);
     }
     for (const loc of getLocalCatalog()) {
-      if (loc.codigo) map.set(loc.codigo.trim().toUpperCase(), loc);
+      if (loc.codigo) {
+        const key = loc.codigo.trim().toUpperCase();
+        const baseDef = map.get(key);
+        map.set(key, {
+          ...baseDef,
+          ...loc,
+          comprimento_padrao_mm: loc.comprimento_padrao_mm || baseDef?.comprimento_padrao_mm || 0,
+          largura_padrao_mm: loc.largura_padrao_mm || baseDef?.largura_padrao_mm || 0,
+          espessura_padrao_mm: loc.espessura_padrao_mm || baseDef?.espessura_padrao_mm || 0,
+          medida_padrao_mm: loc.medida_padrao_mm || baseDef?.medida_padrao_mm || 0
+        });
+      }
     }
     for (const rem of remoteItems) {
-      if (rem.codigo) map.set(rem.codigo.trim().toUpperCase(), rem);
+      if (rem.codigo) {
+        const key = rem.codigo.trim().toUpperCase();
+        const baseDef = map.get(key);
+        map.set(key, {
+          ...baseDef,
+          ...rem,
+          comprimento_padrao_mm: rem.comprimento_padrao_mm || baseDef?.comprimento_padrao_mm || 0,
+          largura_padrao_mm: rem.largura_padrao_mm || baseDef?.largura_padrao_mm || 0,
+          espessura_padrao_mm: rem.espessura_padrao_mm || baseDef?.espessura_padrao_mm || 0,
+          medida_padrao_mm: rem.medida_padrao_mm || baseDef?.medida_padrao_mm || 0
+        });
+      }
     }
 
     const merged = Array.from(map.values());

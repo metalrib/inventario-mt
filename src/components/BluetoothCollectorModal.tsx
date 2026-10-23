@@ -260,11 +260,40 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
         return;
       }
 
-      // CASE A: Existing item found -> AUTO INCREMENT
+      // CASE A: Existing item found -> AUTO INCREMENT & HEAL CORRUPTED DIMENSIONS
       if (existingGeral) {
         const currentQty = Number(existingGeral.quantidade) || 0;
         const newQty = currentQty + qtyToAdd;
-        await onUpdateGeral(existingGeral.id, { quantidade: newQty });
+
+        // Check if existing item has corrupted dimensions (e.g. 1mm length, 304mm width, 405mm thickness)
+        const hasCorruptedDims = (existingGeral.comprimento_mm || 0) <= 10 || (existingGeral.espessura_mm || 0) > 50;
+        
+        let finalComp = existingGeral.comprimento_mm;
+        let finalLarg = existingGeral.largura_mm;
+        let finalEsp = existingGeral.espessura_mm;
+        let finalCod = existingGeral.codigo_item;
+        let finalDesc = existingGeral.descricao_item;
+
+        if (hasCorruptedDims || (existingGeral.codigo_item || '').toUpperCase().startsWith('ITEM-')) {
+          const healProd = effectiveBatchProd || activeBatchProduct;
+          if (healProd) {
+            finalCod = healProd.codigo;
+            finalDesc = healProd.descricao;
+            finalComp = healProd.comprimento_padrao_mm || 1740;
+            finalLarg = healProd.largura_padrao_mm || 850;
+            finalEsp = healProd.espessura_padrao_mm || 0.5;
+          }
+        }
+
+        const updatePayload: Partial<GeralItem> = {
+          quantidade: newQty,
+          codigo_item: finalCod,
+          descricao_item: finalDesc,
+          comprimento_mm: finalComp,
+          largura_mm: finalLarg,
+          espessura_mm: finalEsp
+        };
+        await onUpdateGeral(existingGeral.id, updatePayload);
 
         if (soundEnabled) playBeepDouble();
 
@@ -275,16 +304,16 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
           action: 'incremented',
           itemType: 'geral',
           itemId: existingGeral.id,
-          codigo: existingGeral.codigo_item,
-          descricao: existingGeral.descricao_item,
+          codigo: finalCod,
+          descricao: finalDesc,
           idNomus: existingGeral.id_nomus,
-          medidaFormatted: `${existingGeral.comprimento_mm}x${existingGeral.largura_mm}${existingGeral.espessura_mm ? `x${existingGeral.espessura_mm}` : ''}mm`,
+          medidaFormatted: `${finalComp}x${finalLarg}${finalEsp ? `x${finalEsp}` : ''}mm`,
           quantityAdded: qtyToAdd,
           newTotalQuantity: newQty,
         };
 
         setSessionHistory(prev => [historyItem, ...prev]);
-        triggerFeedback('success', `+${qtyToAdd} ${existingGeral.codigo_item}`, `Quantidade atualizada para ${newQty} ${existingGeral.unidade || 'un'}`);
+        triggerFeedback('success', `+${qtyToAdd} ${finalCod}`, `Medida: ${finalComp}x${finalLarg}x${finalEsp}mm • Saldo: ${newQty}`);
         return;
       }
 
@@ -360,9 +389,27 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
       const finalCodigo = parsed.codigoItem || effectiveProd?.codigo || '';
       const finalDesc = parsed.descItem || effectiveProd?.descricao || (targetCat === 'bumper' ? 'BUMPER' : (finalCodigo ? `Item ${finalCodigo}` : ''));
-      const finalComprimento = parsed.comprimentoMm || effectiveProd?.comprimento_padrao_mm || effectiveProd?.medida_padrao_mm || 0;
-      const finalLargura = parsed.larguraMm || effectiveProd?.largura_padrao_mm || 0;
-      const finalEspessura = parsed.espessuraMm || effectiveProd?.espessura_padrao_mm || 0;
+      
+      // Robust dimension validation (discards bogus 1mm length, 304mm width, or >50mm thickness)
+      let finalComprimento = (parsed.comprimentoMm && parsed.comprimentoMm > 10)
+        ? parsed.comprimentoMm
+        : (effectiveProd?.comprimento_padrao_mm || effectiveProd?.medida_padrao_mm || 0);
+
+      let finalLargura = (parsed.larguraMm && parsed.larguraMm > 10 && !(parsed.larguraMm === 304 && (!parsed.comprimentoMm || parsed.comprimentoMm <= 10)))
+        ? parsed.larguraMm
+        : (effectiveProd?.largura_padrao_mm || 0);
+
+      let finalEspessura = (parsed.espessuraMm && parsed.espessuraMm > 0 && parsed.espessuraMm <= 50)
+        ? parsed.espessuraMm
+        : (effectiveProd?.espessura_padrao_mm || 0);
+
+      // Enforce active batch product dimensions if available and dims are incomplete
+      if (activeBatchProduct && (!finalComprimento || !finalLargura || finalComprimento <= 10)) {
+        finalComprimento = activeBatchProduct.comprimento_padrao_mm || finalComprimento || 1740;
+        finalLargura = activeBatchProduct.largura_padrao_mm || finalLargura || 850;
+        finalEspessura = activeBatchProduct.espessura_padrao_mm || finalEspessura || 0.5;
+      }
+
       const finalNomus = cleanId || parsed.idNomus || generateNomusIdSequence(1)[0];
 
       if (autoProcessMode && finalCodigo) {
