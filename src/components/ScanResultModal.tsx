@@ -45,14 +45,79 @@ interface ScanResultModalProps {
   onNavigateToTab?: (tab: 'perfis' | 'bumpers' | 'gerais') => void;
 }
 
+export function normalizeScannedPayload(raw: string): string {
+  if (!raw) return '';
+  let s = raw.trim();
+
+  // Strip AIM symbology identifiers (e.g., ]Q1, ]Q3, ]C1, ]e0) sent by 2D barcode readers
+  s = s.replace(/^\][A-Za-z0-9]{2}/, '').trim();
+
+  // Detect and fix Brazilian ABNT2 physical keyboard mapping where a US barcode scanner types:
+  // ~ instead of " (double quotes)
+  // ? instead of : (colon)
+  // ´ or ` dead-keys
+  if (s.includes('~') || /~[a-zA-Z0-9_]+~\?/.test(s) || /"[a-zA-Z0-9_]+"\?/.test(s) || /[a-zA-Z0-9_]+\?[a-zA-Z0-9_~"]/.test(s)) {
+    // Replace ~key~? or ~key? with "key":
+    s = s.replace(/~([a-zA-Z0-9_]+)~\?/g, '"$1":');
+    s = s.replace(/~([a-zA-Z0-9_]+)\?/g, '"$1":');
+    // Replace "key"? with "key":
+    s = s.replace(/"([a-zA-Z0-9_]+)"\?/g, '"$1":');
+    // Replace key? with key:
+    s = s.replace(/([a-zA-Z0-9_]+)\?/g, '$1:');
+    // Replace ~? with ":
+    s = s.replace(/~\?/g, '":');
+    // Replace ?~ with :"
+    s = s.replace(/\?~/g, ':"');
+    // Replace any remaining ~ with "
+    s = s.replace(/~/g, '"');
+    // Replace acute accent / deadkey with "
+    s = s.replace(/[´`]/g, '"');
+  }
+
+  // If payload has leading garbage before the first JSON key (e.g. from fast keyboard typing)
+  if (!s.trim().startsWith('{') && /"[a-zA-Z0-9_]+"\s*:/.test(s)) {
+    const keyMatch = s.match(/"[a-zA-Z0-9_]+"\s*:/);
+    if (keyMatch && keyMatch.index !== undefined && keyMatch.index > 0) {
+      s = s.substring(keyMatch.index);
+    }
+  }
+
+  // Handle JSON strings missing outer curly braces
+  const trimmed = s.trim();
+  if (/"[a-zA-Z0-9_]+"\s*:/.test(trimmed)) {
+    if (!trimmed.startsWith('{')) {
+      s = '{' + s.trim();
+    }
+    if (!s.trim().endsWith('}')) {
+      s = s.trim() + '}';
+    }
+  }
+
+  return s;
+}
+
 export function parseDimensionString(rawMedida: string) {
   if (!rawMedida) return { comprimento: 0, largura: 0, espessura: 0, raw: '' };
 
-  // Clean string and look for dimensions like 1740 x 850 x 0.5 or 1740*850*0.5 or 6000 mm
-  const clean = rawMedida.replace(/[^\d.,xX*]/g, ' ').trim();
+  // Remove material alloy descriptions like INOX, INOX304, etc. so the letter 'X' in INOX is NEVER treated as a multiplier
+  let sanitized = rawMedida.replace(/\bINOX(?:\s*\d+)?\b/gi, ' ');
+  // Remove unit suffixes (M2, m², mm, etc.) so numbers in units (like the 2 in M2) are not parsed as dimensions
+  sanitized = sanitized.replace(/\b(?:m2|mm|mil[ií]metros|metros?|unidades?|un|p[cç]s?)\b/gi, ' ');
+  sanitized = sanitized.replace(/m²/gi, ' ');
+  sanitized = sanitized.replace(/m2/gi, ' ');
+  // Remove JSON artifacts if present
+  sanitized = sanitized.replace(/\{[^}]*\}/g, ' ');
+
+  // Clean string and look for dimensions like 2040 x 220 x 0.5 or 2040*220*0.5 or 6000 mm
+  const clean = sanitized.replace(/[^\d.,xX*]/g, ' ').trim();
   const parts = clean.split(/[xX*]+/).map(p => p.trim()).filter(Boolean);
 
   const nums = parts.map(p => parseFloat(p.replace(',', '.'))).filter(n => !isNaN(n) && n > 0);
+
+  // Reject false match where second number is material grade 304/430/316 and first number is <= 50
+  if (nums.length >= 2 && (nums[1] === 304 || nums[1] === 430 || nums[1] === 316) && nums[0] <= 50) {
+    return { comprimento: 0, largura: 0, espessura: 0, raw: rawMedida };
+  }
 
   if (nums.length >= 3) {
     return {
@@ -85,9 +150,8 @@ export function parseScannedPayload(
   existingGerais: GeralItem[] = [],
   existingPerfis: PerfilItem[] = []
 ) {
-  let text = (raw || '').trim();
-  // Strip AIM symbology identifiers (e.g., ]Q1, ]Q3, ]C1, ]e0) sent by 2D barcode readers
-  text = text.replace(/^\][A-Za-z0-9]{2}/, '').trim();
+  // Normalize ABNT2 keyboard scanner input (converts ~ to " and ? to :)
+  let text = normalizeScannedPayload(raw || '');
 
   let parsedJson: any = null;
 
@@ -127,25 +191,30 @@ export function parseScannedPayload(
     parsedDesc = String(parsedJson.desc || parsedJson.descricao || parsedJson.descricaoItem || parsedJson.d || '').trim();
 
     if (parsedJson.comprimento_mm !== undefined && parsedJson.comprimento_mm !== null) {
-      parsedComprimentoMm = parseFloat(String(parsedJson.comprimento_mm)) || 0;
+      const c = parseFloat(String(parsedJson.comprimento_mm)) || 0;
+      if (c > 10) parsedComprimentoMm = c;
     }
     if (parsedJson.largura_mm !== undefined && parsedJson.largura_mm !== null) {
-      parsedLarguraMm = parseFloat(String(parsedJson.largura_mm)) || 0;
+      const l = parseFloat(String(parsedJson.largura_mm)) || 0;
+      if (l > 10) parsedLarguraMm = l;
     }
     if (parsedJson.espessura_mm !== undefined && parsedJson.espessura_mm !== null) {
-      parsedEspessuraMm = parseFloat(String(parsedJson.espessura_mm)) || 0;
+      const e = parseFloat(String(parsedJson.espessura_mm)) || 0;
+      if (e > 0 && e <= 50) parsedEspessuraMm = e;
     }
 
     const rawMedidaStr = String(parsedJson.medida || parsedJson.medidaFormatted || '').trim();
     if (rawMedidaStr) {
       const dims = parseDimensionString(rawMedidaStr);
-      if (!parsedComprimentoMm && dims.comprimento > 0) parsedComprimentoMm = dims.comprimento;
-      if (!parsedLarguraMm && dims.largura > 0) parsedLarguraMm = dims.largura;
-      if (!parsedEspessuraMm && dims.espessura > 0) parsedEspessuraMm = dims.espessura;
+      if (dims.comprimento > 10) parsedComprimentoMm = dims.comprimento;
+      if (dims.largura > 10) parsedLarguraMm = dims.largura;
+      if (dims.espessura > 0 && dims.espessura <= 50) parsedEspessuraMm = dims.espessura;
     }
 
+    // Only fallback to medida_mm if length is still 0 and value is a realistic dimension (> 10mm)
     if (!parsedComprimentoMm && parsedJson.medida_mm) {
-      parsedComprimentoMm = parseFloat(String(parsedJson.medida_mm)) || 0;
+      const singleMedida = parseFloat(String(parsedJson.medida_mm)) || 0;
+      if (singleMedida > 10) parsedComprimentoMm = singleMedida;
     }
 
     if (parsedJson.quantidade || parsedJson.qtd) {
@@ -229,9 +298,9 @@ export function parseScannedPayload(
     }
   }
 
-  // Priority 1 for Dimensions: Explicit "MEDIDA:" or "DIMENSÕES:" field from label
+  // Priority 1 for Dimensions: Explicit "MEDIDA:" or "DIMENSÕES:" field from label (excluding "medida_mm")
   if (!parsedComprimentoMm || !parsedLarguraMm) {
-    const explicitMedidaMatch = text.match(/(?:medida|dimens[oõ]es)\s*[:=-]?\s*([^\r\n:;]+?)(?=\s*(?:id|c[oó]d|peso|qtd|quantidade|desc|$))/i);
+    const explicitMedidaMatch = text.match(/(?:(?<!_)medida(?!_mm)|dimens[oõ]es)\s*[:=-]?\s*([^\r\n:;]+?)(?=\s*(?:id|c[oó]d|peso|qtd|quantidade|desc|$))/i);
     if (explicitMedidaMatch) {
       const dims = parseDimensionString(explicitMedidaMatch[1]);
       if (dims.comprimento > 10) parsedComprimentoMm = dims.comprimento;

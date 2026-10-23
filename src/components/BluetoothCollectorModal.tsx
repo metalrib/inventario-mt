@@ -18,7 +18,7 @@ import {
   Play
 } from 'lucide-react';
 import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem, AppMode } from '../types';
-import { parseScannedPayload } from './ScanResultModal';
+import { parseScannedPayload, normalizeScannedPayload } from './ScanResultModal';
 import { playBeepSuccess, playBeepDouble, playBeepChime, playBeepError } from '../utils/scannerAudio';
 import { generateNomusIdSequence } from '../services/firebase';
 import { DEFAULT_PRODUCT_CATALOG } from '../data/catalog';
@@ -84,7 +84,9 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
     return saved !== null ? saved === 'true' : true;
   });
   const [activeBatchProductCode, setActiveBatchProductCode] = useState<string>(() => {
-    return localStorage.getItem('metalrib_collector_batch_product') || '023.0116';
+    const saved = localStorage.getItem('metalrib_collector_batch_product');
+    if (!saved || saved === '023.0116') return 'AUTO';
+    return saved;
   });
   const [sessionHistory, setSessionHistory] = useState<ScanSessionItem[]>([]);
   const [lastFeedback, setLastFeedback] = useState<{
@@ -160,7 +162,7 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
 
   // Main Barcode / QR Code Processor
   const processScan = async (rawCode: string) => {
-    const trimmed = (rawCode || '').trim();
+    const trimmed = normalizeScannedPayload(rawCode || '').trim();
     if (!trimmed) return;
 
     setIsProcessing(true);
@@ -191,7 +193,7 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
               Math.abs((g.largura_mm || 0) - parsed.larguraMm) < 2
             );
           }
-          return true;
+          return false;
         }
         return false;
       });
@@ -503,7 +505,7 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const code = inputValue.trim();
+      const code = (e.currentTarget.value || inputValue || '').trim();
       if (code) {
         processScan(code);
       }
@@ -619,8 +621,8 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
                   </div>
                   <p className="text-[11px] text-slate-600 font-medium">
                     {activeBatchProduct 
-                      ? `Todo código Nomus lido (ex: 2026.08.21.xxxx) será gravado como ${activeBatchProduct.codigo} (${activeBatchProduct.comprimento_padrao_mm}x${activeBatchProduct.largura_padrao_mm}mm)`
-                      : 'Somente salva se o código de barras contiver especificações completas'}
+                      ? `Lote fixo: códigos Nomus simples sem medida serão gravados como ${activeBatchProduct.codigo} (${activeBatchProduct.comprimento_padrao_mm}x${activeBatchProduct.largura_padrao_mm}mm). QR Codes com medidas usam o valor real da etiqueta.`
+                      : 'Modo Automático: grava o produto e as medidas exatas contidas na etiqueta bipada.'}
                   </p>
                 </div>
               </div>
@@ -631,12 +633,12 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
                   onChange={e => handleSelectBatchProduct(e.target.value)}
                   className="w-full sm:w-64 h-9 px-2.5 bg-white border-2 border-blue-300 text-xs font-black text-slate-800 rounded-lg shadow-xs focus:outline-none focus:border-[#1b367c] focus:ring-1 focus:ring-blue-200 cursor-pointer"
                 >
+                  <option value="AUTO">⚡ Automático (Respeitar QR Code / Etiqueta Bipada)</option>
                   <option value="023.0116">023.0116 - CHAPA INOX 304 ESC (1740x850x0.5)</option>
                   <option value="020.0093">020.0093 - CHAPA BR 0,43 - M2</option>
                   <option value="023.0105">023.0105 - CHAPA AC FQ 3000x1200x12.50</option>
                   <option value="023.0096">023.0096 - CHAPA AC FQ 3000x1200x2.65</option>
                   <option value="022.0017">022.0017 - PERFIL VAI E VEM</option>
-                  <option value="AUTO">⚡ Automático (Somente Código nas Barras)</option>
                   {allCatalog
                     .filter(c => !['023.0116', '020.0093', '023.0105', '023.0096', '022.0017'].includes(c.codigo))
                     .map(c => (
@@ -701,6 +703,10 @@ export const BluetoothCollectorModal: React.FC<BluetoothCollectorModalProps> = (
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="Aguardando disparo do leitor Bluetooth... (ou digite e dê Enter)"
               className="w-full h-11 px-3.5 bg-white border-2 border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1b367c] focus:ring-2 focus:ring-blue-100 transition-all shadow-inner"
             />
