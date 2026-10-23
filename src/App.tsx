@@ -33,6 +33,7 @@ import {
   updateBumper,
   deleteBumper,
   addGeral,
+  addMultipleGerais,
   updateGeral,
   deleteGeral,
   saveCatalogProduct,
@@ -218,6 +219,11 @@ export default function App() {
   // Handlers for Chapas & Gerais
   const handleSaveGeral = async (itemData: Omit<GeralItem, 'id'>) => {
     const saved = await addGeral(itemData);
+    return saved;
+  };
+
+  const handleSaveMultipleGerais = async (itemsData: Omit<GeralItem, 'id'>[]) => {
+    const saved = await addMultipleGerais(itemsData);
     return saved;
   };
 
@@ -582,6 +588,7 @@ export default function App() {
             <div className="w-full">
               <GeralForm
                 onSaveGeral={handleSaveGeral}
+                onSaveMultipleGerais={handleSaveMultipleGerais}
                 productCatalog={productCatalog}
                 prefilledProductItem={prefilledProductItem}
                 onClearPrefilledProduct={() => setPrefilledProductItem(null)}
@@ -710,6 +717,9 @@ export default function App() {
         }}
         onAddGeral={async (item) => {
           await handleSaveGeral(item);
+        }}
+        onAddMultipleGerais={async (items) => {
+          await handleSaveMultipleGerais(items);
         }}
         onUpdatePerfil={async (id, data) => {
           await handleEditPerfil(id, data);

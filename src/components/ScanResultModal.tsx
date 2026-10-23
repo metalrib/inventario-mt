@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { PerfilItem, BumperItem, GeralItem, ProductCatalogItem, AppMode } from '../types';
 import { CATALOGO_PERFIS } from '../data/catalog';
+import { generateNomusIdSequence } from '../services/firebase';
 
 interface ScanResultModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ interface ScanResultModalProps {
   onAddPerfil?: (item: Omit<PerfilItem, 'id'>) => Promise<void>;
   onAddBumper?: (item: Omit<BumperItem, 'id'>) => Promise<void>;
   onAddGeral?: (item: Omit<GeralItem, 'id'>) => Promise<void>;
+  onAddMultipleGerais?: (items: Omit<GeralItem, 'id'>[]) => Promise<void>;
   onUpdatePerfil?: (id: string | number, updated: Partial<PerfilItem>) => Promise<void>;
   onUpdateBumper?: (id: string | number, updated: Partial<BumperItem>) => Promise<void>;
   onUpdateGeral?: (id: string | number, updated: Partial<GeralItem>) => Promise<void>;
@@ -257,6 +259,7 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   onAddPerfil,
   onAddBumper,
   onAddGeral,
+  onAddMultipleGerais,
   onUpdatePerfil,
   onUpdateBumper,
   onUpdateGeral,
@@ -281,6 +284,12 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
   const [quantidadeInput, setQuantidadeInput] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
+  // Split multiple sheets into individual rows with +1 minute IDs
+  const [desmembrarChapas, setDesmembrarChapas] = useState<boolean>(() => {
+    const saved = localStorage.getItem('metalrib_desmembrar_chapas');
+    return saved !== null ? saved === 'true' : true;
+  });
 
   const safePerfis = perfis || [];
   const safeBumpers = bumpers || [];
@@ -460,19 +469,52 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
         : (catalogMatch ? catalogMatch.desc : `Item ${finalCode}`);
 
       if (targetCategory === 'geral') {
-        const itemPayload: Omit<GeralItem, 'id'> = {
-          id_nomus: finalId,
-          codigo_item: finalCode,
-          descricao_item: finalDescription,
-          comprimento_mm: compNum,
-          largura_mm: largNum,
-          espessura_mm: espNum,
-          quantidade: qtdNum,
-          unidade: unidadeInput || 'm²'
-        };
+        if (qtdNum > 1 && desmembrarChapas) {
+          const allExisting = [
+            ...safeGerais.map(g => g.id_nomus || ''),
+            ...safePerfis.map(p => p.id_nomus || ''),
+            ...safeBumpers.map(b => b.id_nomus || '')
+          ];
+          const idSequence = generateNomusIdSequence(qtdNum, finalId, allExisting);
+          const singleUnitArea = (compNum > 0 && largNum > 0)
+            ? Number(((compNum * largNum) / 1000000).toFixed(4))
+            : 1;
 
-        if (onAddGeral) {
-          await onAddGeral(itemPayload);
+          const itemsToAdd: Omit<GeralItem, 'id'>[] = idSequence.map(seqId => ({
+            id_nomus: seqId,
+            codigo_item: finalCode,
+            descricao_item: finalDescription,
+            comprimento_mm: compNum,
+            largura_mm: largNum,
+            espessura_mm: espNum,
+            quantidade: singleUnitArea,
+            unidade: unidadeInput || 'm²'
+          }));
+
+          if (onAddMultipleGerais) {
+            await onAddMultipleGerais(itemsToAdd);
+          } else if (onAddGeral) {
+            for (const itemPayload of itemsToAdd) {
+              await onAddGeral(itemPayload);
+            }
+          }
+          setFeedbackMsg(`✅ ${qtdNum} chapas inseridas individualmente! IDs: ${idSequence[0]} até ${idSequence[idSequence.length - 1]}`);
+        } else {
+          const itemPayload: Omit<GeralItem, 'id'> = {
+            id_nomus: finalId,
+            codigo_item: finalCode,
+            descricao_item: finalDescription,
+            comprimento_mm: compNum,
+            largura_mm: largNum,
+            espessura_mm: espNum,
+            quantidade: qtdNum,
+            unidade: unidadeInput || 'm²'
+          };
+
+          if (onAddGeral) {
+            await onAddGeral(itemPayload);
+          }
+          setFeedbackMsg(`✅ Inserido no inventário como novo registro (+${qtdNum} un)!`);
         }
       } else if (targetCategory === 'perfil') {
         const itemPayload: Omit<PerfilItem, 'id'> = {
@@ -886,6 +928,24 @@ export const ScanResultModal: React.FC<ScanResultModalProps> = ({
                         />
                       </div>
                     </div>
+
+                    {qtdNum > 1 && (
+                      <div className="mt-2 p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-950 font-bold flex items-start gap-2 select-none shadow-xs">
+                        <input
+                          type="checkbox"
+                          id="scanDesmembrarCheck"
+                          checked={desmembrarChapas}
+                          onChange={e => {
+                            setDesmembrarChapas(e.target.checked);
+                            localStorage.setItem('metalrib_desmembrar_chapas', String(e.target.checked));
+                          }}
+                          className="mt-0.5 w-4 h-4 rounded border-amber-400 text-[#1b367c] focus:ring-[#1b367c] cursor-pointer"
+                        />
+                        <label htmlFor="scanDesmembrarCheck" className="cursor-pointer text-[11px] leading-tight flex-1">
+                          Desmembrar em {qtdNum} chapas individuais separadas no inventário (IDs no formato AAAA.MM.DD.HHMM avançando os minutos um a um)
+                        </label>
+                      </div>
+                    )}
                   </div>
                 )}
 

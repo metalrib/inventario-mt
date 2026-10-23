@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp, Palette } from 'lucide-react';
+import { Package, Plus, Zap, RefreshCw, BookOpen, Sparkles, Check, CheckCircle2, Pin, PinOff, CheckSquare, Square, ChevronDown, ChevronUp, Palette, Layers, Clock } from 'lucide-react';
 import { GeralItem, ProductCatalogItem } from '../types';
-import { findCatalogProductByCode, generateUniqueNomusId, formatNomusIdInput } from '../services/firebase';
+import { findCatalogProductByCode, generateUniqueNomusId, generateNomusIdSequence, formatNomusIdInput } from '../services/firebase';
 
 interface GeralFormProps {
   onAddItem?: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
   onSaveGeral?: (item: Omit<GeralItem, 'id'>) => Promise<GeralItem | void>;
+  onSaveMultipleGerais?: (items: Omit<GeralItem, 'id'>[]) => Promise<GeralItem[] | void>;
   operadorPadrao?: string;
   autoImprimirAoSalvar?: boolean;
   onOpenPrintModal?: (item: GeralItem) => void;
@@ -24,6 +25,7 @@ interface GeralFormProps {
 export const GeralForm: React.FC<GeralFormProps> = ({
   onAddItem,
   onSaveGeral,
+  onSaveMultipleGerais,
   operadorPadrao = 'Operador Metalrib',
   autoImprimirAoSalvar,
   onOpenPrintModal,
@@ -55,6 +57,18 @@ export const GeralForm: React.FC<GeralFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveToCatalogCheck, setSaveToCatalogCheck] = useState(true);
   const [autoFilledBadge, setAutoFilledBadge] = useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
+
+  // Split multiple sheets into individual rows with +1 minute IDs
+  const [desmembrarChapas, setDesmembrarChapas] = useState<boolean>(() => {
+    const saved = localStorage.getItem('metalrib_desmembrar_chapas');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleDesmembrarChapas = (val: boolean) => {
+    setDesmembrarChapas(val);
+    localStorage.setItem('metalrib_desmembrar_chapas', String(val));
+  };
 
   // Fast-counting workflow automation states
   const [autoGerarId, setAutoGerarId] = useState<boolean>(() => {
@@ -290,32 +304,83 @@ export const GeralForm: React.FC<GeralFormProps> = ({
         }
       }
 
-      let finalQuantidade = Math.max(1, quantidade);
       const compNum = Number(comprimentoMm) || 0;
       const largNum = Number(larguraMm) || 0;
       const isM2Unit = unidade === 'm²' || unidade === 'metros quadrados' || unidade === 'm2';
-      if (isM2Unit && compNum > 0 && largNum > 0) {
-        finalQuantidade = Number((((compNum * largNum) / 1000000) * quantidade).toFixed(4));
-      }
+      const singlePieceArea = (isM2Unit && compNum > 0 && largNum > 0)
+        ? Number(((compNum * largNum) / 1000000).toFixed(4))
+        : 1;
 
-      // 2. Add Item to Inventory
-      let newItem: any = null;
-      if (handleSave) {
-        newItem = await handleSave({
-          id_nomus: finalIdNomus,
+      let generatedIdsUsed: string[] = [];
+
+      if (desmembrarChapas && quantidade > 1) {
+        // Desmembra cada chapa individualmente com ID no formato AAAA.MM.DD.HHMM avançando os minutos um a um
+        const idSequence = generateNomusIdSequence(
+          quantidade,
+          finalIdNomus,
+          existingNomusIds,
+          selectedTom
+        );
+        generatedIdsUsed = idSequence;
+
+        const itemsToAdd: Omit<GeralItem, 'id'>[] = idSequence.map(seqId => ({
+          id_nomus: seqId,
           codigo_item: finalCodigo,
           descricao_item: finalDescricao,
           comprimento_mm: compNum,
           largura_mm: largNum,
           espessura_mm: Number(espessuraMm) || 0,
-          quantidade: finalQuantidade,
+          quantidade: singlePieceArea,
           unidade,
           operador: operador.trim() || operadorPadrao || 'Operador Produção'
-        });
-      }
+        }));
 
-      if (autoImprimirAoSalvar && handlePrintModal && newItem) {
-        handlePrintModal(newItem);
+        let addedList: any[] = [];
+        if (onSaveMultipleGerais) {
+          addedList = (await onSaveMultipleGerais(itemsToAdd)) || [];
+        } else if (handleSave) {
+          for (const it of itemsToAdd) {
+            const savedOne = await handleSave(it);
+            if (savedOne) addedList.push(savedOne);
+          }
+        }
+
+        if (autoImprimirAoSalvar && handlePrintModal && addedList.length > 0) {
+          handlePrintModal(addedList[0]);
+        }
+
+        setSuccessBanner(`✅ ${quantidade} chapas cadastradas individualmente! IDs: ${idSequence[0]} até ${idSequence[idSequence.length - 1]}`);
+        setTimeout(() => setSuccessBanner(null), 5000);
+      } else {
+        // Registro único
+        let finalQuantidade = Math.max(1, quantidade);
+        if (isM2Unit && compNum > 0 && largNum > 0) {
+          finalQuantidade = Number((((compNum * largNum) / 1000000) * quantidade).toFixed(4));
+        }
+
+        generatedIdsUsed = [finalIdNomus];
+
+        let newItem: any = null;
+        if (handleSave) {
+          newItem = await handleSave({
+            id_nomus: finalIdNomus,
+            codigo_item: finalCodigo,
+            descricao_item: finalDescricao,
+            comprimento_mm: compNum,
+            largura_mm: largNum,
+            espessura_mm: Number(espessuraMm) || 0,
+            quantidade: finalQuantidade,
+            unidade,
+            operador: operador.trim() || operadorPadrao || 'Operador Produção'
+          });
+        }
+
+        if (autoImprimirAoSalvar && handlePrintModal && newItem) {
+          handlePrintModal(newItem);
+        }
+
+        setSuccessBanner(`✅ Chapa cadastrada com sucesso! ID: ${finalIdNomus}`);
+        setTimeout(() => setSuccessBanner(null), 4000);
       }
 
       // 3. Smart Reset according to workflow options:
@@ -347,7 +412,7 @@ export const GeralForm: React.FC<GeralFormProps> = ({
 
       // If auto-generate ID is active, generate next ID automatically with active Tom preserved!
       if (autoGerarId) {
-        const nextBase = generateUniqueNomusId([finalIdNomus, ...existingNomusIds]);
+        const nextBase = generateUniqueNomusId([...generatedIdsUsed, ...existingNomusIds]);
         setIdNomus(selectedTom ? applyTomToId(nextBase, selectedTom) : nextBase);
       } else {
         setIdNomus('');
@@ -453,6 +518,13 @@ export const GeralForm: React.FC<GeralFormProps> = ({
               </button>
             </div>
           </div>
+
+      {successBanner && (
+        <div className="mb-3 p-3.5 bg-emerald-50 border-2 border-emerald-400 text-emerald-950 rounded-xl text-xs font-bold flex items-center gap-2.5 shadow-sm animate-in fade-in">
+          <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+          <span className="flex-1">{successBanner}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ID Nomus & Operador */}
@@ -762,6 +834,29 @@ export const GeralForm: React.FC<GeralFormProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Opção para desmembrar em chapas individuais com minutos sequenciais */}
+        {quantidade > 1 && (
+          <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-3 text-xs text-amber-950 space-y-1.5 shadow-xs">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={desmembrarChapas}
+                onChange={e => handleToggleDesmembrarChapas(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-amber-400 text-[#1b367c] focus:ring-[#1b367c] cursor-pointer"
+              />
+              <div className="flex-1">
+                <span className="font-black text-amber-950 flex items-center gap-1.5 text-xs">
+                  <Layers size={15} className="text-amber-700" />
+                  Cadastrar as {quantidade} chapas separadas no inventário (1 registro por chapa)
+                </span>
+                <p className="text-[11px] text-amber-800 font-medium mt-0.5 leading-relaxed">
+                  O sistema gerará {quantidade} linhas no inventário. O ID permanece no formato oficial (<strong>AAAA.MM.DD.HHMM</strong>{selectedTom ? `.T${selectedTom.toUpperCase().replace(/^T/i, '')}` : ''}) e avança os <strong>minutos um a um</strong> (+1 min) para não ter IDs repetidos.
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Dimensões / Medidas em mm */}
         <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">

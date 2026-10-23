@@ -448,6 +448,54 @@ export async function addGeral(item: Omit<GeralItem, 'id' | 'created_at'> & { cr
   return fullItem;
 }
 
+export async function addMultipleGerais(items: (Omit<GeralItem, 'id' | 'created_at'> & { created_at?: string })[]): Promise<GeralItem[]> {
+  if (!items || items.length === 0) return [];
+
+  const createdItems: GeralItem[] = [];
+  const baseTime = Date.now();
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    const docId = `geral_${baseTime + idx}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = item.created_at || new Date(baseTime + idx * 1000).toISOString();
+    const fullItem: GeralItem = {
+      ...item,
+      id: docId,
+      created_at: now
+    };
+    createdItems.push(fullItem);
+    if (fullItem.id_nomus) {
+      registerUsedNomusId(fullItem.id_nomus);
+    }
+  }
+
+  try {
+    const batch = writeBatch(db);
+    for (const fullItem of createdItems) {
+      const ref = doc(db, COL_GERAIS, String(fullItem.id));
+      batch.set(ref, {
+        id_nomus: fullItem.id_nomus || '',
+        codigo_item: fullItem.codigo_item || '',
+        descricao_item: fullItem.descricao_item || '',
+        comprimento_mm: Number(fullItem.comprimento_mm || 0),
+        largura_mm: Number(fullItem.largura_mm || 0),
+        espessura_mm: Number(fullItem.espessura_mm || 0),
+        quantidade: Number(fullItem.quantidade),
+        unidade: fullItem.unidade || 'm²',
+        operador: fullItem.operador || 'Operador',
+        created_at: fullItem.created_at
+      });
+    }
+    await batch.commit();
+  } catch (err) {
+    console.error('Erro ao adicionar lote de itens gerais no Firebase:', err);
+  }
+
+  const current = getLocalGerais();
+  saveLocalGerais([...createdItems, ...current]);
+  return createdItems;
+}
+
 export async function updateGeral(id: string | number, updates: Partial<GeralItem>): Promise<void> {
   const docId = String(id);
   try {
@@ -743,6 +791,88 @@ export function generateUniqueNomusId(existingIds: string[] = [], currentId?: st
   registerUsedNomusId(base);
 
   return base;
+}
+
+export function parseNomusIdDate(idStr: string): { date: Date; toneSuffix: string } | null {
+  if (!idStr) return null;
+  const toneMatch = idStr.match(/(\.T[A-Za-z0-9_-]+)$/i);
+  const toneSuffix = toneMatch ? toneMatch[1].toUpperCase() : '';
+  const cleanId = toneMatch ? idStr.substring(0, toneMatch.index).trim() : idStr.trim();
+
+  // Match AAAA.MM.DD.HHMM
+  const match = cleanId.match(/^(\d{4})\.(\d{2})\.(\d{2})\.(\d{2})(\d{2})$/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    const hour = parseInt(match[4], 10);
+    const minute = parseInt(match[5], 10);
+    const d = new Date(year, month, day, hour, minute, 0, 0);
+    if (!isNaN(d.getTime())) {
+      return { date: d, toneSuffix };
+    }
+  }
+  return null;
+}
+
+export function generateNomusIdSequence(
+  count: number,
+  startingId?: string,
+  existingIds: string[] = [],
+  selectedTone?: string
+): string[] {
+  if (count <= 0) return [];
+  const idsToAvoid = getAllKnownNomusIds(existingIds);
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  let toneSuffix = '';
+  if (selectedTone && selectedTone.trim()) {
+    const cleanT = selectedTone.trim().toUpperCase().replace(/^T/i, '');
+    toneSuffix = `.T${cleanT}`;
+  }
+
+  let startDate: Date;
+  if (startingId && startingId.trim()) {
+    const parsed = parseNomusIdDate(startingId.trim());
+    if (parsed) {
+      startDate = parsed.date;
+      if (parsed.toneSuffix && !toneSuffix) {
+        toneSuffix = parsed.toneSuffix;
+      }
+    } else {
+      startDate = new Date();
+      startDate.setSeconds(0, 0);
+    }
+  } else {
+    startDate = new Date();
+    startDate.setSeconds(0, 0);
+  }
+
+  const result: string[] = [];
+  let currentDate = new Date(startDate.getTime());
+
+  for (let i = 0; i < count; i++) {
+    // For subsequent items (i > 0), advance minute by at least +1
+    if (i > 0) {
+      currentDate = new Date(currentDate.getTime() + 60000);
+    }
+
+    let base = `${currentDate.getFullYear()}.${pad(currentDate.getMonth() + 1)}.${pad(currentDate.getDate())}.${pad(currentDate.getHours())}${pad(currentDate.getMinutes())}`;
+
+    // If already in idsToAvoid, advance minutes one by one until free
+    while (idsToAvoid.has(base) || (toneSuffix && idsToAvoid.has(base + toneSuffix))) {
+      currentDate = new Date(currentDate.getTime() + 60000);
+      base = `${currentDate.getFullYear()}.${pad(currentDate.getMonth() + 1)}.${pad(currentDate.getDate())}.${pad(currentDate.getHours())}${pad(currentDate.getMinutes())}`;
+    }
+
+    const fullId = base + toneSuffix;
+    addIdToTrack(idsToAvoid, fullId);
+    registerUsedNomusId(fullId);
+    registerUsedNomusId(base);
+    result.push(fullId);
+  }
+
+  return result;
 }
 
 export function formatNomusIdInput(value: string): string {
